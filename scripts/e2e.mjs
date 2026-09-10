@@ -1,6 +1,13 @@
 import { _electron as electron } from "playwright";
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, readFile, writeFile, rename } from "node:fs/promises";
+import {
+  mkdtemp,
+  mkdir,
+  readFile,
+  writeFile,
+  rename,
+  realpath,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import sharp from "sharp";
@@ -436,7 +443,9 @@ try {
   const restoredAgent = await page.evaluate(() => window.lumaflux.settings());
   assert.equal(restoredAgent.enabled, true);
   assert.ok(restoredAgent.endpoint);
-  assert.deepEqual(restoredAgent.roots, [temp]);
+  // Saved roots are canonicalized: macOS /var aliases /private/var, and
+  // Windows runners can expose a short (8.3) path through tmpdir().
+  assert.deepEqual(restoredAgent.roots, [await realpath(temp)]);
   const emptyAgent = await page.evaluate(() =>
     window.lumaflux.updateSettings(true, []),
   );
