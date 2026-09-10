@@ -201,7 +201,51 @@ try {
   const id = state.photos.find((p) => p.name === "color-study.png").id;
   assert.equal(await page.locator(".navigation").count(), 0);
   assert.equal(await page.locator(".library-toolbar").count(), 0);
+  await page
+    .locator("summary")
+    .filter({ hasText: /^Details$/ })
+    .click();
+  await page
+    .getByRole("slider", { name: "Luminance noise", exact: true })
+    .focus();
+  await page.keyboard.press("ArrowRight");
+  await poll(() =>
+    page.evaluate(
+      async (id) =>
+        (await window.lumaflux.command("get_photo", { id })).recipe
+          .noiseLuminance > 0,
+      id,
+    ),
+  );
+  await poll(() =>
+    page.getByRole("slider", { name: "Color noise", exact: true }).isEnabled(),
+  );
+  await page.getByRole("slider", { name: "Color noise", exact: true }).focus();
+  await page.keyboard.press("ArrowRight");
+  await poll(() =>
+    page.evaluate(
+      async (id) =>
+        (await window.lumaflux.command("get_photo", { id })).recipe.noiseColor >
+        0,
+      id,
+    ),
+  );
+  await page.screenshot({ path: "output/playwright/denoising.png" });
   await page.getByRole("tab", { name: "Composition", exact: true }).click();
+  await poll(() =>
+    page.getByRole("slider", { name: "Distortion", exact: true }).isEnabled(),
+  );
+  await page.getByRole("slider", { name: "Distortion", exact: true }).focus();
+  await page.keyboard.press("ArrowRight");
+  await poll(() =>
+    page.evaluate(
+      async (id) =>
+        (await window.lumaflux.command("get_photo", { id })).recipe
+          .lensDistortion > 0,
+      id,
+    ),
+  );
+  await page.screenshot({ path: "output/playwright/lens-correction.png" });
   await page.getByRole("button", { name: "Rotate right", exact: true }).click();
   await poll(() =>
     page.evaluate(
@@ -368,6 +412,9 @@ try {
     const s = await window.lumaflux.command("get_app_state");
     return s.photos.find((p) => p.name === "warm-study.png");
   });
+  assert.equal(pasted.recipe.noiseLuminance, 1);
+  assert.equal(pasted.recipe.noiseColor, 1);
+  assert.equal(pasted.recipe.lensDistortion, 0);
   assert.equal(pasted.recipe.rotation, 0);
   assert.equal(pasted.recipe.crop, null);
   await page.getByRole("button", { name: "Library", exact: true }).click();

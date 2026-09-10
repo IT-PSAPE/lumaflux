@@ -101,6 +101,9 @@ export function App() {
     photo?.recipe.straighten,
     photo?.recipe.flipX,
     photo?.recipe.flipY,
+    photo?.recipe.lensDistortion,
+    photo?.recipe.lensRed,
+    photo?.recipe.lensBlue,
   ]);
   useEffect(() => {
     setDraft(null);
@@ -188,11 +191,15 @@ export function App() {
       return;
     }
     const colors = Object.fromEntries(
-      adjustmentControls.map(([key]) => [key, photo.recipe[key]]),
+      adjustmentControls
+        .filter((c) => c[5] !== "Lens correction")
+        .map(([key]) => [key, photo.recipe[key]]),
     );
     if (name === "copy") {
       setClipboard(colors);
-      setNotice("Adjustments copied. Crop and rotation stay with each photo.");
+      setNotice(
+        "Adjustments copied. Crop, rotation, and lens correction stay with each photo.",
+      );
       return;
     }
     if (name === "paste") {
@@ -761,13 +768,7 @@ export function App() {
         )}
       </div>
       <footer className="statusbar">
-        <span>
-          {busy
-            ? "Working…"
-            : ready
-              ? "Ready"
-              : "Opening library…"}
-        </span>
+        <span>{busy ? "Working…" : ready ? "Ready" : "Opening library…"}</span>
         <span>
           {state.activity[0]?.source === "MCP"
             ? `Agent: ${state.activity[0].action}`

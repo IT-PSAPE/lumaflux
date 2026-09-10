@@ -13,11 +13,26 @@ try {
     .jpeg()
     .toFile(file);
   const times: number[] = [];
+  const corrections = process.argv.includes("--corrections");
   for (let i = 0; i < 7; i++) {
     const start = performance.now();
     await renderImage(
       file,
-      { ...neutralRecipe(), exposure: i * 0.1, straighten: 5 },
+      {
+        ...neutralRecipe(),
+        exposure: i * 0.1,
+        straighten: 5,
+        ...(corrections
+          ? {
+              lensDistortion: 25,
+              lensVignette: 20,
+              lensRed: 5,
+              lensBlue: -5,
+              noiseLuminance: 60,
+              noiseColor: 50,
+            }
+          : {}),
+      },
       {
         format: "jpeg",
         maxDimension: 1600,
@@ -30,6 +45,7 @@ try {
     JSON.stringify({
       source: "6000×4000 JPEG",
       preview: 1600,
+      corrections,
       timesMs: times,
       warmMedianMs: times.slice(1).sort((a, b) => a - b)[3],
     }),

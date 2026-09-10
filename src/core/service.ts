@@ -224,7 +224,15 @@ export class PhotoService extends EventEmitter {
           throw new Error(
             `CONFLICT: ${p.name} is revision ${p.revision}; reload before editing`,
           );
-        const geometry = ["rotation", "straighten", "flipX", "flipY"].some(
+        const geometry = [
+          "rotation",
+          "straighten",
+          "flipX",
+          "flipY",
+          "lensDistortion",
+          "lensRed",
+          "lensBlue",
+        ].some(
           (k) =>
             k in e.patch &&
             e.patch[k as keyof Recipe] !== p.recipe[k as keyof Recipe],

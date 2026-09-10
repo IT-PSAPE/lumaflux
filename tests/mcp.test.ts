@@ -62,11 +62,31 @@ test("MCP authenticates, discovers, edits, previews and rejects stale/out-of-roo
       !(
         await client.callTool({
           name: "apply_edits",
-          arguments: { id: p.id, expectedRevision: 0, patch: { exposure: 1 } },
+          arguments: {
+            id: p.id,
+            expectedRevision: 0,
+            patch: {
+              exposure: 1,
+              noiseLuminance: 40,
+              noiseColor: 50,
+              lensDistortion: 20,
+              lensVignette: 30,
+              lensRed: 5,
+              lensBlue: -5,
+            },
+          },
         })
       ).isError,
     );
     assert.equal(s.photo(p.id).recipe.exposure, 1);
+    assert.equal(s.photo(p.id).recipe.noiseColor, 50);
+    assert.equal(s.photo(p.id).recipe.lensDistortion, 20);
+    const capabilities = await client.callTool({
+      name: "get_capabilities",
+      arguments: {},
+    });
+    assert.ok(JSON.stringify(capabilities).includes("noiseLuminance"));
+    assert.ok(JSON.stringify(capabilities).includes("lensDistortion"));
     await new Promise((resolve) => setTimeout(resolve, 50));
     assert.equal(notified, true);
     await client.unsubscribeResource({ uri: "lumaflux://app/state" });

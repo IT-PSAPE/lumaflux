@@ -104,3 +104,5 @@ Preview rendering caches downsampled sources and geometry within per-worker byte
 Download desktop installers from [GitHub Releases](https://github.com/IT-PSAPE/lumaflux/releases). Releases are built from the version in `release.yaml`. See [the release process](docs/releases.md) for platforms, version mapping, validation, and retry instructions.
 
 RAW decoding uses [LibRaw-Wasm](https://github.com/ybouane/LibRaw-Wasm) 1.6.0, bundled locally (no external converter installation or network required). Its WebAssembly engine runs in disposable workers; developed sources are cached within a 128 MB limit per rendering context and invalidated when originals change.
+
+Lens correction is available under **Composition → Lens correction** (manual distortion, corner illumination, and red/blue fringe alignment). **Adjustments → Details** contains separate luminance and color noise reduction. Both work with RAW/raster photos, exports, undo, and MCP edits. See [lens correction and denoising](docs/lens-and-denoising.md) for ranges, behavior, and limitations.

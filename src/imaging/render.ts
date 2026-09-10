@@ -1,9 +1,12 @@
+import { correctLens } from "./lens.js";
+import { denoise } from "./denoise.js";
 import { isRawFile } from "../shared/formats.js";
 import { decodeRaw } from "./raw.js";
 import sharp, { type OutputInfo } from "sharp";
 import { ByteCache } from "./cache.js";
 type RawImage = { data: Buffer; info: OutputInfo };
 const sourceCache = new ByteCache<RawImage>(64 * 1024 * 1024);
+const noiseCache = new ByteCache<Buffer>(16 * 1024 * 1024);
 const geometryCache = new ByteCache<RawImage>(32 * 1024 * 1024);
 import exifReader from "exif-reader";
 import { stat } from "node:fs/promises";
@@ -227,6 +230,10 @@ export async function renderImage(
     r.flipX,
     r.flipY,
     r.crop,
+    r.lensDistortion,
+    r.lensVignette,
+    r.lensRed,
+    r.lensBlue,
   ]);
   let rendered = opts.preview ? geometryCache.get(key) : undefined;
   if (!rendered) {
@@ -234,13 +241,24 @@ export async function renderImage(
     if (opts.preview)
       geometryCache.set(key, rendered, rendered.data.byteLength);
   }
+  let clean = rendered.data;
+  if (r.noiseLuminance || r.noiseColor) {
+    const noiseKey = `${key}:${r.noiseLuminance}:${r.noiseColor}`;
+    const cached = opts.preview ? noiseCache.get(noiseKey) : undefined;
+    clean =
+      cached ??
+      denoise(
+        rendered.data,
+        rendered.info.width,
+        rendered.info.height,
+        r.noiseLuminance,
+        r.noiseColor,
+      );
+    if (opts.preview && !cached)
+      noiseCache.set(noiseKey, clean, clean.byteLength);
+  }
   let output = sharp(
-    pixels(
-      Buffer.from(rendered.data),
-      rendered.info.width,
-      rendered.info.height,
-      r,
-    ),
+    pixels(Buffer.from(clean), rendered.info.width, rendered.info.height, r),
     { raw: rendered.info },
   );
   if (r.sharpening > 0)
@@ -299,6 +317,10 @@ async function prepare(
     raw = await decoded.raw().toBuffer({ resolveWithObject: true });
     if (opts.preview) sourceCache.set(sourceKey, raw, raw.data.byteLength);
   }
+  raw = {
+    ...raw,
+    data: correctLens(raw.data, raw.info.width, raw.info.height, r),
+  };
   let pipeline = sharp(raw.data, { raw: raw.info });
   if (r.rotation) {
     raw = await pipeline

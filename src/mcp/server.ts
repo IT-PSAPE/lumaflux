@@ -110,7 +110,22 @@ export function createMcpServer(commands: Commands, roots: string[]) {
         geometry: {
           rotation: "0–3 quarter turns",
           straighten: "-45–45 degrees",
-          crop: "normalized after orientation/rotation/flips; null resets",
+          crop: "normalized after lens correction/orientation/rotation/flips; null resets",
+        },
+        lensCorrection: {
+          mode: "manual",
+          distortion:
+            "-100–100; zero off; automatically keeps frame inside source",
+          cornerIllumination: "0–100; compensates dark corners before geometry",
+          chromaticAberration:
+            "lensRed/lensBlue -100–100; radial channel alignment",
+          profiles: false,
+        },
+        denoising: {
+          luminance: "noiseLuminance 0–100",
+          color: "noiseColor 0–100",
+          method:
+            "separable edge-aware bilateral filter before tone and sharpening; zero bypasses",
         },
         atomicBatch: true,
         mutations:

@@ -73,3 +73,11 @@ The same complete desktop workflow passed against the rebuilt packaged app after
 - All four matrix jobs passed type checking, 45 tests, packaging, and the complete packaged-app smoke workflow. The version and publishing jobs also passed. No CI repairs were needed in this run.
 - Published Windows x64 NSIS installer; macOS arm64/x64 DMG and ZIP; Linux x64 AppImage and Debian package. Verified all seven download digests against the published `SHA256SUMS.txt` using GitHub's asset digest metadata.
 - Release is public, not a draft; its tag points to the verified source commit. Updating the root `release.yaml` version on main triggers the next release.
+
+## Lens correction and noise reduction
+
+Pulled upstream main through `2fc6fa4` before implementation, retaining its RAW support. Added manual lens distortion, corner illumination, red/blue chromatic alignment, and independent luminance/color denoising. See `docs/lens-and-denoising.md` for processing order and scope.
+
+All 54 tests pass, including noise/error reduction and edge-preservation fixtures, legacy defaults, alpha safety, original preservation, correction cache invalidation, small-image preview/export agreement, history persistence, and MCP access. The Electron workflow exercises the new controls with the existing crop, comparison, zoom, agent, export, and relink flows. Screenshots include `lens-correction.png` and `denoising.png`.
+
+The rebuilt Apple Silicon desktop app also passed `node scripts/release-smoke.mjs`, including noise-copy/lens-exclusion checks and relaunch/relink. No new public release was created for this local feature addition.

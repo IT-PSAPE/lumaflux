@@ -191,51 +191,66 @@ export function Adjustments({
               </Btn>
             </details>
           )}
-          {tab === "Adjustments" &&
-            ["Light", "Color", "Detail"].map((group) => (
-              <details open={group !== "Detail"} key={group}>
-                <summary>{group === "Detail" ? "Details" : group}</summary>
-                {adjustmentControls
-                  .filter((c) => c[5] === group)
-                  .map(([key, label, min, max, step]) => (
-                    <Slider.Root
-                      key={key}
-                      className="adjustment"
-                      disabled={!photo || busy}
-                      min={min}
-                      max={max}
-                      step={step}
-                      value={recipe?.[key] ?? 0}
-                      onValueChange={(value) => change(key, Number(value))}
-                      onValueCommitted={(value) => commit(key, Number(value))}
-                    >
-                      <div className="slider-label">
-                        <Slider.Label>{label}</Slider.Label>
-                        <button
-                          className="value-reset"
-                          title={`Reset ${label}`}
-                          onClick={() => onCommit({ [key]: 0 })}
-                          disabled={!photo || busy}
-                        >
-                          {(recipe?.[key] ?? 0) > 0 ? "+" : ""}
-                          {key === "exposure"
-                            ? (recipe?.[key] ?? 0).toFixed(2)
-                            : (recipe?.[key] ?? 0)}
-                        </button>
-                      </div>
-                      <Slider.Control className="slider-control">
-                        <Slider.Track className="slider-track">
-                          <Slider.Indicator className="slider-indicator" />
-                          <Slider.Thumb
-                            className="slider-thumb"
-                            aria-label={label}
-                          />
-                        </Slider.Track>
-                      </Slider.Control>
-                    </Slider.Root>
-                  ))}
-              </details>
-            ))}
+          {(tab === "Composition"
+            ? ["Lens correction"]
+            : tab === "Adjustments"
+              ? ["Light", "Color", "Detail"]
+              : []
+          ).map((group) => (
+            <details open={group !== "Detail"} key={group}>
+              <summary>{group === "Detail" ? "Details" : group}</summary>
+              {group === "Lens correction" && (
+                <p className="muted panel-help">
+                  Manual correction. Distortion keeps edges in bounds; fringe
+                  sliders align red and blue channels.
+                </p>
+              )}
+              {group === "Detail" && (
+                <p className="muted panel-help">
+                  Noise reduction preserves edges. Use 1:1 to judge fine detail.
+                </p>
+              )}
+              {adjustmentControls
+                .filter((c) => c[5] === group)
+                .map(([key, label, min, max, step]) => (
+                  <Slider.Root
+                    key={key}
+                    className="adjustment"
+                    disabled={!photo || busy}
+                    min={min}
+                    max={max}
+                    step={step}
+                    value={recipe?.[key] ?? 0}
+                    onValueChange={(value) => change(key, Number(value))}
+                    onValueCommitted={(value) => commit(key, Number(value))}
+                  >
+                    <div className="slider-label">
+                      <Slider.Label>{label}</Slider.Label>
+                      <button
+                        className="value-reset"
+                        title={`Reset ${label}`}
+                        onClick={() => onCommit({ [key]: 0 })}
+                        disabled={!photo || busy}
+                      >
+                        {(recipe?.[key] ?? 0) > 0 ? "+" : ""}
+                        {key === "exposure"
+                          ? (recipe?.[key] ?? 0).toFixed(2)
+                          : (recipe?.[key] ?? 0)}
+                      </button>
+                    </div>
+                    <Slider.Control className="slider-control">
+                      <Slider.Track className="slider-track">
+                        <Slider.Indicator className="slider-indicator" />
+                        <Slider.Thumb
+                          className="slider-thumb"
+                          aria-label={label}
+                        />
+                      </Slider.Track>
+                    </Slider.Control>
+                  </Slider.Root>
+                ))}
+            </details>
+          ))}
         </fieldset>
         {photo && tab === "Info" && (
           <details open>
