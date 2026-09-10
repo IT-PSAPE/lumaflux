@@ -30,6 +30,16 @@ Run rendering outside the Electron renderer and main event loop, with bounded wo
 
 Support per-photo undo/redo, reset, copy/paste adjustments, and applying adjustments to a selection. A completed slider gesture creates one history entry. Persist committed recipes and history. Batch edits validate every target before committing. Each photo has a monotonically increasing revision so stale agent/UI writes produce an explicit conflict instead of silently overwriting newer work.
 
+### Recipe and concurrency contract
+
+The neutral recipe uses zero for every adjustment except sharpening, whose zero means disabled. Exposure ranges from -5 to +5 EV in 0.05 increments; hue ranges from -180 to +180 degrees in integer increments. Brightness, contrast, highlights, shadows, whites, blacks, temperature, tint, saturation, and vibrance range from -100 to +100 in integer increments. Temperature and tint are relative artistic adjustments, not absolute Kelvin measurements. Sharpening and vignette range from 0 to 100. Quarter turns are integers from 0 to 3; straighten ranges from -45 to +45 degrees in 0.1 increments. A null crop means the complete transformed image; otherwise require positive normalized width/height and a rectangle wholly within [0, 1].
+
+Live slider previews are transient requests with a draft recipe; they do not mutate the catalog. Gesture completion submits the recipe patch and the revision captured when the gesture began. If an agent has changed the photo in the meantime, reject the stale commit, discard the draft, show the current committed recipe, and explain the conflict. Undo and redo create new revisions rather than restoring old revision numbers. A repeated write using the same expected revision must fail after its first successful commit.
+
+Batch edit requests are atomic: reject the whole batch if any ID, recipe, or expected revision is invalid. A successful response contains the new revision for each target; a rejected response identifies failing targets without changing any target. Imports and exports are independent per-file operations and may partially succeed. Do not describe these different semantics with one generic batch-result contract.
+
+Copy/paste and selection synchronization copy tonal/color/finishing adjustments by default. Geometry is copied only when explicitly selected, because differently oriented photos need independent crop decisions. Unsupported multi-page/animated inputs are rejected with an explanation in the initial release rather than silently choosing a frame.
+
 ## Catalog and application boundary
 
 The Electron main process owns a single catalog service and serialized mutation queue. Use an atomically replaced, versioned JSON catalog for the first release; keep storage behind a repository interface for later SQLite migration. On save failure, retain the previous catalog and surface the error. Use a single-instance lock to avoid concurrent application writers.
@@ -68,7 +78,7 @@ Tool families:
 - Visual feedback: `get_preview` returns an image content block with recipe revision and rendered dimensions.
 - Output: `export_photos`, `get_export_job`, `cancel_export_job`.
 
-Use strict schemas, bounded pagination and batch sizes, explicit photo IDs, expected revisions for mutations, structured error codes, and accurate read-only/destructive/idempotent tool annotations. Batch operations return per-photo results. Export jobs return IDs immediately. The app-state resource provides selection and library summaries; photo resources expose metadata and recipes. Publish resource updates where supported and maintain an activity log identifying UI versus agent mutations.
+Use strict schemas, bounded pagination and batch sizes, explicit photo IDs, expected revisions for mutations, structured error codes, and accurate read-only/destructive/idempotent tool annotations. Atomic batch edits return committed revisions or validation/conflict details; imports and exports return per-file outcomes. Export jobs return IDs immediately. The app-state resource provides selection and library summaries; photo resources expose metadata and recipes. Publish resource updates where supported and maintain an activity log identifying UI versus agent mutations.
 
 ## Validation and acceptance
 
