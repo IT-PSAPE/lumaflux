@@ -22,6 +22,8 @@ import type { AppState, DesktopAPI, Photo, Recipe } from "../shared/model";
 import { adjustmentControls } from "../shared/model";
 import { Btn } from "./ui";
 import { Adjustments } from "./Adjustments";
+import { PanelResize } from "./PanelResize";
+import { FolderBrowser } from "./FolderBrowser";
 import { Viewer } from "./Viewer";
 import { AgentDialog, ExportDialog } from "./Dialogs";
 declare global {
@@ -35,6 +37,26 @@ export function App() {
   const [state, setState] = useState<AppState>(empty);
   const [activeId, setActiveId] = useState<string>();
   const [view, setView] = useState<"gallery" | "editor">("gallery");
+  const [tab, setTab] = useState("Adjustments");
+  const [aspect, setAspect] = useState("free");
+  const [locked, setLocked] = useState(false);
+  const [foldersOpen, setFoldersOpen] = useState(false);
+  const [leftWidth, setLeftWidth] = useState(() =>
+    Math.max(
+      180,
+      Math.min(480, Number(localStorage.getItem("leftPanelWidth")) || 220),
+    ),
+  );
+  const [rightWidth, setRightWidth] = useState(() =>
+    Math.max(
+      240,
+      Math.min(480, Number(localStorage.getItem("rightPanelWidth")) || 280),
+    ),
+  );
+  useEffect(() => {
+    localStorage.setItem("leftPanelWidth", String(leftWidth));
+    localStorage.setItem("rightPanelWidth", String(rightWidth));
+  }, [leftWidth, rightWidth]);
   const [section, setSection] = useState("all");
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState("name");
@@ -72,6 +94,15 @@ export function App() {
   };
   const photo = state.photos.find((p) => p.id === activeId);
   const recipe = photo ? (draft ?? photo.recipe) : undefined;
+  useEffect(() => {
+    setAspect("free");
+  }, [
+    activeId,
+    photo?.recipe.rotation,
+    photo?.recipe.straighten,
+    photo?.recipe.flipX,
+    photo?.recipe.flipY,
+  ]);
   useEffect(() => {
     setDraft(null);
   }, [activeId, photo?.revision]);
@@ -221,8 +252,10 @@ export function App() {
       } else if (event.key === "ArrowRight") navigate(1);
       else if (event.key === "ArrowLeft") navigate(-1);
       else if (event.key.toLowerCase() === "g") setView("gallery");
-      else if (event.key.toLowerCase() === "e" && photo) setView("editor");
-      else if (event.key === "Escape") setView("gallery");
+      else if (event.key.toLowerCase() === "e" && photo) {
+        setView("editor");
+        if (section === "jobs") setSection("all");
+      } else if (event.key === "Escape") setView("gallery");
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
@@ -258,7 +291,10 @@ export function App() {
           <Btn
             className={view === "editor" ? "active" : ""}
             disabled={!photo}
-            onClick={() => setView("editor")}
+            onClick={() => {
+              setView("editor");
+              if (section === "jobs") setSection("all");
+            }}
           >
             <ImageIcon size={15} />
             Edit
@@ -281,89 +317,95 @@ export function App() {
         </div>
       </header>
       <div className="workspace">
-        <aside className="navigation panel">
-          <div className="import-actions">
-            <Btn
-              className="wide"
-              disabled={busy}
-              onClick={() =>
-                safe(async () => importPaths(await api.chooseImport()))
-              }
-            >
-              <Plus size={16} />
-              Import photos
-            </Btn>
-            <Btn
-              className="wide quiet"
-              disabled={busy}
-              onClick={() =>
-                safe(async () => importPaths(await api.chooseImport(true)))
-              }
-            >
-              <FolderOpen size={15} />
-              Import folder
-            </Btn>
-          </div>
-          <h2>Library</h2>
-          <button
-            className={`nav-item ${section === "all" ? "selected" : ""}`}
-            onClick={() => {
-              setSection("all");
-              setView("gallery");
-            }}
-          >
-            <Images size={16} />
-            All photos<span>{state.photos.length}</span>
-          </button>
-          <button
-            className={`nav-item ${section === "favorites" ? "selected" : ""}`}
-            onClick={() => {
-              setSection("favorites");
-              setView("gallery");
-            }}
-          >
-            <Heart size={16} />
-            Favorites
-            <span>{state.photos.filter((p) => p.favorite).length}</span>
-          </button>
-          <button
-            className={`nav-item ${section === "jobs" ? "selected" : ""}`}
-            onClick={() => {
-              setSection("jobs");
-              setView("gallery");
-            }}
-          >
-            <ArrowDownToLine size={16} />
-            Exports<span>{state.jobs.length}</span>
-          </button>
-          <h2>Folders</h2>
-          <div className="folder-list">
-            {folders.length ? (
-              folders.map((folder) => (
-                <button
-                  title={folder}
-                  className={`nav-item ${section === folder ? "selected" : ""}`}
-                  key={folder}
-                  onClick={() => {
-                    setSection(folder);
-                    setView("gallery");
-                  }}
+        {view === "gallery" && foldersOpen && (
+          <>
+            <aside className="navigation panel" style={{ width: leftWidth }}>
+              <h2>Library</h2>
+              <button
+                className={`nav-item ${section === "all" ? "selected" : ""}`}
+                onClick={() => {
+                  setSection("all");
+                  setView("gallery");
+                }}
+              >
+                <Images size={16} />
+                All photos<span>{state.photos.length}</span>
+              </button>
+              <button
+                className={`nav-item ${section === "favorites" ? "selected" : ""}`}
+                onClick={() => {
+                  setSection("favorites");
+                  setView("gallery");
+                }}
+              >
+                <Heart size={16} />
+                Favorites
+                <span>{state.photos.filter((p) => p.favorite).length}</span>
+              </button>
+              <button
+                className={`nav-item ${section === "jobs" ? "selected" : ""}`}
+                onClick={() => {
+                  setSection("jobs");
+                  setView("gallery");
+                }}
+              >
+                <ArrowDownToLine size={16} />
+                Exports<span>{state.jobs.length}</span>
+              </button>
+              <h2>Folders</h2>
+              <div className="folder-list">
+                {folders.length ? (
+                  folders.map((folder) => (
+                    <button
+                      title={folder}
+                      className={`nav-item ${section === folder ? "selected" : ""}`}
+                      key={folder}
+                      onClick={() => {
+                        setSection(folder);
+                        setView("gallery");
+                      }}
+                    >
+                      <FolderOpen size={15} />
+                      <span className="folder-name">
+                        {folder.split(/[\\/]/).pop()}
+                      </span>
+                    </button>
+                  ))
+                ) : (
+                  <p className="muted small">Imported folders appear here.</p>
+                )}
+              </div>
+              <FolderBrowser onImport={importPaths} onError={setNotice} />
+              <div className="import-actions">
+                <Btn
+                  className="wide"
+                  disabled={busy}
+                  onClick={() =>
+                    safe(async () => importPaths(await api.chooseImport()))
+                  }
+                >
+                  <Plus size={16} />
+                  Import photos
+                </Btn>
+                <Btn
+                  className="wide quiet"
+                  disabled={busy}
+                  onClick={() =>
+                    safe(async () => importPaths(await api.chooseImport(true)))
+                  }
                 >
                   <FolderOpen size={15} />
-                  <span className="folder-name">
-                    {folder.split(/[\\/]/).pop()}
-                  </span>
-                </button>
-              ))
-            ) : (
-              <p className="muted small">Imported folders appear here.</p>
-            )}
-          </div>
-          <div className="nav-bottom">
-            <span className="local-dot" />
-            Local library<p>Originals are never modified.</p>
-          </div>
-        </aside>
+                  Import folder
+                </Btn>
+              </div>
+            </aside>
+            <PanelResize
+              side="left"
+              width={leftWidth}
+              onChange={setLeftWidth}
+            />
+          </>
+        )}
         <main className="main-area">
           {section === "jobs" ? (
             <div className="jobs-view">
@@ -416,81 +458,88 @@ export function App() {
             </div>
           ) : (
             <>
-              <div className="library-toolbar">
-                <div>
-                  <h1>
-                    {view === "editor"
-                      ? photo?.name
-                      : section === "all"
+              {view === "gallery" && (
+                <div className="library-toolbar">
+                  <div>
+                    <h1>
+                      {section === "all"
                         ? "All photos"
                         : section === "favorites"
                           ? "Favorites"
                           : section.split(/[\\/]/).pop()}
-                  </h1>
-                  <span className="muted small">
-                    {photos.length} photo{photos.length === 1 ? "" : "s"}
-                    {state.selection.length
-                      ? ` · ${state.selection.length} selected`
-                      : ""}
-                  </span>
+                    </h1>
+                    <span className="muted small">
+                      {photos.length} photo{photos.length === 1 ? "" : "s"}
+                      {state.selection.length
+                        ? ` · ${state.selection.length} selected`
+                        : ""}
+                    </span>
+                  </div>
+                  <span className="spacer" />
+                  {view === "gallery" ? (
+                    <>
+                      <div className="search">
+                        <Search size={15} />
+                        <input
+                          aria-label="Search photos"
+                          placeholder="Search photos"
+                          value={query}
+                          onChange={(e) => setQuery(e.target.value)}
+                        />
+                      </div>
+                      <select
+                        aria-label="Sort photos"
+                        value={sort}
+                        onChange={(e) => setSort(e.target.value)}
+                      >
+                        <option value="name">Name</option>
+                        <option value="date">Newest</option>
+                        <option value="rating">Rating</option>
+                      </select>
+                      <select
+                        aria-label="Minimum rating"
+                        value={minRating}
+                        onChange={(e) => setMinRating(Number(e.target.value))}
+                      >
+                        <option value={0}>All ratings</option>
+                        {[1, 2, 3, 4, 5].map((n) => (
+                          <option key={n} value={n}>
+                            {n}+ stars
+                          </option>
+                        ))}
+                      </select>
+                    </>
+                  ) : (
+                    <>
+                      <Btn
+                        aria-label="Previous photo"
+                        disabled={activeIndex <= 0}
+                        onClick={() => navigate(-1)}
+                      >
+                        <ChevronLeft size={16} />
+                      </Btn>
+                      <Btn
+                        aria-label="Next photo"
+                        disabled={activeIndex >= photos.length - 1}
+                        onClick={() => navigate(1)}
+                      >
+                        <ChevronRight size={16} />
+                      </Btn>
+                    </>
+                  )}
                 </div>
-                <span className="spacer" />
-                {view === "gallery" ? (
-                  <>
-                    <div className="search">
-                      <Search size={15} />
-                      <input
-                        aria-label="Search photos"
-                        placeholder="Search photos"
-                        value={query}
-                        onChange={(e) => setQuery(e.target.value)}
-                      />
-                    </div>
-                    <select
-                      aria-label="Sort photos"
-                      value={sort}
-                      onChange={(e) => setSort(e.target.value)}
-                    >
-                      <option value="name">Name</option>
-                      <option value="date">Newest</option>
-                      <option value="rating">Rating</option>
-                    </select>
-                    <select
-                      aria-label="Minimum rating"
-                      value={minRating}
-                      onChange={(e) => setMinRating(Number(e.target.value))}
-                    >
-                      <option value={0}>All ratings</option>
-                      {[1, 2, 3, 4, 5].map((n) => (
-                        <option key={n} value={n}>
-                          {n}+ stars
-                        </option>
-                      ))}
-                    </select>
-                  </>
-                ) : (
-                  <>
-                    <Btn
-                      aria-label="Previous photo"
-                      disabled={activeIndex <= 0}
-                      onClick={() => navigate(-1)}
-                    >
-                      <ChevronLeft size={16} />
-                    </Btn>
-                    <Btn
-                      aria-label="Next photo"
-                      disabled={activeIndex >= photos.length - 1}
-                      onClick={() => navigate(1)}
-                    >
-                      <ChevronRight size={16} />
-                    </Btn>
-                  </>
-                )}
-              </div>
+              )}
               {view === "editor" && photo && recipe ? (
                 <>
                   <Viewer
                     photo={photo}
+                    composition={tab === "Composition"}
+                    aspect={aspect}
+                    locked={locked}
+                    previous={() => navigate(-1)}
+                    next={() => navigate(1)}
+                    canPrevious={activeIndex > 0}
+                    canNext={activeIndex < photos.length - 1}
                     recipe={recipe}
                     preview={api.preview}
                     onCrop={(crop) => void commit({ crop })}
@@ -680,16 +729,71 @@ export function App() {
             </>
           )}
         </main>
-        <Adjustments
-          photo={photo}
-          recipe={recipe}
-          onDraft={setDraft}
-          onCommit={(patch, revision) => void commit(patch, revision)}
-          onAction={(name) => void safe(() => action(name))}
-          copied={!!clipboard}
-          busy={busy}
-        />
+        {view === "editor" && (
+          <>
+            <PanelResize
+              side="right"
+              width={rightWidth}
+              onChange={(w) => setRightWidth(Math.max(240, w))}
+            />
+            <div className="inspector-shell" style={{ width: rightWidth }}>
+              <Adjustments
+                tab={tab}
+                onTab={setTab}
+                aspect={aspect}
+                onAspect={(v) => {
+                  setAspect(v);
+                  setLocked(v !== "free");
+                }}
+                locked={locked}
+                onLocked={setLocked}
+                photo={photo}
+                recipe={recipe}
+                onDraft={setDraft}
+                onCommit={(patch, revision) => void commit(patch, revision)}
+                onAction={(name) => void safe(() => action(name))}
+                copied={!!clipboard}
+                busy={busy}
+              />
+            </div>
+          </>
+        )}
       </div>
+      {view === "gallery" && (
+        <div className="library-bottom">
+          <Btn
+            aria-pressed={foldersOpen}
+            onClick={() => setFoldersOpen(!foldersOpen)}
+          >
+            <FolderOpen size={14} />
+            Folders
+          </Btn>
+          <select
+            aria-label="Library collection"
+            value={section}
+            onChange={(e) => setSection(e.target.value)}
+          >
+            <option value="all">All photos</option>
+            <option value="favorites">Favorites</option>
+            <option value="jobs">Exports</option>
+            {folders.map((f) => (
+              <option key={f} value={f}>
+                {f.split("/").pop()}
+              </option>
+            ))}
+          </select>
+          <span className="spacer" />
+          <Btn
+            disabled={busy}
+            onClick={() =>
+              safe(async () => importPaths(await api.chooseImport()))
+            }
+          >
+            <Plus size={14} />
+            Import photos
+          </Btn>
+        </div>
+      )}
       <footer className="statusbar">
         <span>
           {busy

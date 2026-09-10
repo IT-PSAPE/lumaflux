@@ -168,10 +168,31 @@ export async function renderImage(
     .raw()
     .toBuffer({ resolveWithObject: true });
   let pipeline = sharp(raw.data, { raw: raw.info });
-  if (r.rotation || r.straighten) {
+  if (r.rotation) {
     raw = await pipeline
-      .rotate(r.rotation * 90 + r.straighten, {
-        background: { r: 0, g: 0, b: 0, alpha: 0 },
+      .rotate(r.rotation * 90)
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    pipeline = sharp(raw.data, { raw: raw.info });
+  }
+  if (r.straighten) {
+    const { width: w, height: h } = raw.info;
+    const angle = (Math.abs(r.straighten) * Math.PI) / 180;
+    const c = Math.cos(angle),
+      s = Math.sin(angle);
+    const scale = Math.min(w / (w * c + h * s), h / (w * s + h * c));
+    const width = Math.max(1, Math.floor(w * scale) - 2);
+    const height = Math.max(1, Math.floor(h * scale) - 2);
+    raw = await pipeline
+      .rotate(r.straighten, { background: { r: 0, g: 0, b: 0, alpha: 0 } })
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    raw = await sharp(raw.data, { raw: raw.info })
+      .extract({
+        left: Math.floor((raw.info.width - width) / 2),
+        top: Math.floor((raw.info.height - height) / 2),
+        width,
+        height,
       })
       .raw()
       .toBuffer({ resolveWithObject: true });

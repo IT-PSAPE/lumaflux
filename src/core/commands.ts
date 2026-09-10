@@ -1,3 +1,5 @@
+import { readdir, realpath } from "node:fs/promises";
+import path from "node:path";
 import { z } from "zod";
 import { PhotoService } from "./service.js";
 import { ExportManager, type Renderer } from "./export.js";
@@ -14,6 +16,37 @@ export class Commands {
   }
   async run(name: string, args: unknown = {}, source = "UI"): Promise<unknown> {
     switch (name) {
+      case "browse_folder": {
+        if (source !== "UI")
+          throw new Error(
+            "Folder browsing is available in the desktop UI only",
+          );
+        const directory = await realpath(
+          z
+            .object({ path: z.string().min(1) })
+            .strict()
+            .parse(args).path,
+        );
+        const entries = await readdir(directory, { withFileTypes: true });
+        const item = (entry: { name: string }) => ({
+          name: entry.name,
+          path: path.join(directory, entry.name),
+        });
+        return {
+          path: directory,
+          parent: path.dirname(directory),
+          folders: entries
+            .filter((e) => e.isDirectory() && !e.name.startsWith("."))
+            .sort((a, b) => a.name.localeCompare(b.name))
+            .map(item),
+          files: entries
+            .filter(
+              (e) => e.isFile() && /\.(jpe?g|png|webp|tiff?)$/i.test(e.name),
+            )
+            .sort((a, b) => a.name.localeCompare(b.name))
+            .map(item),
+        };
+      }
       case "get_app_state":
         return this.service.state();
       case "get_photo":

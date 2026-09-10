@@ -10,6 +10,7 @@ import {
   Copy,
   ClipboardPaste,
   RefreshCcw,
+  Layers,
 } from "lucide-react";
 import { adjustmentControls, type Photo, type Recipe } from "../shared/model";
 import { Btn } from "./ui";
@@ -21,7 +22,19 @@ export function Adjustments({
   onAction,
   copied,
   busy,
+  tab,
+  onTab,
+  aspect,
+  onAspect,
+  locked,
+  onLocked,
 }: {
+  tab: string;
+  onTab: (tab: string) => void;
+  aspect: string;
+  onAspect: (value: string) => void;
+  locked: boolean;
+  onLocked: (value: boolean) => void;
   photo?: Photo;
   recipe?: Recipe;
   onDraft: (r: Recipe | null) => void;
@@ -46,11 +59,31 @@ export function Adjustments({
   }
   return (
     <aside className="adjustments panel">
-      <div className="panel-title">
-        <h2>Adjustments</h2>
-        <span className="muted">
-          {photo ? `Rev ${photo.revision}` : "No photo"}
-        </span>
+      <div className="inspector-tabs" role="tablist" aria-label="Photo tools">
+        {["Adjustments", "Composition", "Info"].map((name) => (
+          <button
+            key={name}
+            role="tab"
+            id={`tab-${name}`}
+            aria-controls="inspector-content"
+            tabIndex={tab === name ? 0 : -1}
+            onKeyDown={(e) => {
+              const names = ["Adjustments", "Composition", "Info"];
+              const direction =
+                e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
+              if (direction) {
+                e.preventDefault();
+                const next = names[(names.indexOf(name) + direction + 3) % 3];
+                onTab(next);
+                document.getElementById(`tab-${next}`)?.focus();
+              }
+            }}
+            aria-selected={tab === name}
+            onClick={() => onTab(name)}
+          >
+            {name}
+          </button>
+        ))}
       </div>
       <div className="tool-row">
         <Btn
@@ -79,120 +112,163 @@ export function Adjustments({
           <RefreshCcw size={15} />
         </Btn>
       </div>
-      <div className="adjustments-scroll">
+      <div
+        className="adjustments-scroll"
+        id="inspector-content"
+        role="tabpanel"
+        aria-labelledby={`tab-${tab}`}
+      >
         {!photo && (
           <p className="muted panel-help">
             Select a photo to adjust light, color, and composition.
           </p>
         )}
         <fieldset disabled={!photo || busy}>
-          <details open>
-            <summary>Composition</summary>
-            <div className="tool-row">
-              <Btn
-                aria-label="Rotate left"
-                title="Rotate left"
-                onClick={() =>
-                  onCommit({ rotation: ((recipe?.rotation ?? 0) + 3) % 4 })
-                }
-              >
-                <RotateCcw size={16} />
-              </Btn>
-              <Btn
-                aria-label="Rotate right"
-                title="Rotate right"
-                onClick={() =>
-                  onCommit({ rotation: ((recipe?.rotation ?? 0) + 1) % 4 })
-                }
-              >
-                <RotateCw size={16} />
-              </Btn>
-              <Btn
-                aria-label="Flip horizontal"
-                title="Flip horizontal"
-                onClick={() => onCommit({ flipX: !recipe?.flipX })}
-              >
-                <FlipHorizontal2 size={16} />
-              </Btn>
-              <Btn
-                aria-label="Flip vertical"
-                title="Flip vertical"
-                onClick={() => onCommit({ flipY: !recipe?.flipY })}
-              >
-                <FlipVertical2 size={16} />
-              </Btn>
-            </div>
-            <label className="number-row">
-              Straighten{" "}
-              <input
-                aria-label="Straighten"
-                type="number"
+          {tab === "Composition" && (
+            <details open>
+              <summary>Composition</summary>
+              <div className="tool-row">
+                <Btn
+                  aria-label="Rotate left"
+                  title="Rotate left"
+                  onClick={() =>
+                    onCommit({ rotation: ((recipe?.rotation ?? 0) + 3) % 4 })
+                  }
+                >
+                  <RotateCcw size={16} />
+                </Btn>
+                <Btn
+                  aria-label="Rotate right"
+                  title="Rotate right"
+                  onClick={() =>
+                    onCommit({ rotation: ((recipe?.rotation ?? 0) + 1) % 4 })
+                  }
+                >
+                  <RotateCw size={16} />
+                </Btn>
+                <Btn
+                  aria-label="Flip horizontal"
+                  title="Flip horizontal"
+                  onClick={() => onCommit({ flipX: !recipe?.flipX })}
+                >
+                  <FlipHorizontal2 size={16} />
+                </Btn>
+                <Btn
+                  aria-label="Flip vertical"
+                  title="Flip vertical"
+                  onClick={() => onCommit({ flipY: !recipe?.flipY })}
+                >
+                  <FlipVertical2 size={16} />
+                </Btn>
+              </div>
+              <Slider.Root
+                className="adjustment"
                 min={-45}
                 max={45}
                 step={0.1}
                 value={recipe?.straighten ?? 0}
-                onChange={(e) => {
-                  const v = Number(e.target.value);
-                  if (v >= -45 && v <= 45) onCommit({ straighten: v });
-                }}
-              />
-              <span>°</span>
-            </label>
-            <Btn
-              className="wide"
-              disabled={!recipe?.crop}
-              onClick={() => onCommit({ crop: null })}
-            >
-              Reset crop
-            </Btn>
-          </details>
-          {["Light", "Color", "Detail"].map((group) => (
-            <details open={group !== "Detail"} key={group}>
-              <summary>{group}</summary>
-              {adjustmentControls
-                .filter((c) => c[5] === group)
-                .map(([key, label, min, max, step]) => (
-                  <Slider.Root
-                    key={key}
-                    className="adjustment"
-                    disabled={!photo || busy}
-                    min={min}
-                    max={max}
-                    step={step}
-                    value={recipe?.[key] ?? 0}
-                    onValueChange={(value) => change(key, Number(value))}
-                    onValueCommitted={(value) => commit(key, Number(value))}
-                  >
-                    <div className="slider-label">
-                      <Slider.Label>{label}</Slider.Label>
-                      <button
-                        className="value-reset"
-                        title={`Reset ${label}`}
-                        onClick={() => onCommit({ [key]: 0 })}
-                        disabled={!photo || busy}
-                      >
-                        {(recipe?.[key] ?? 0) > 0 ? "+" : ""}
-                        {key === "exposure"
-                          ? (recipe?.[key] ?? 0).toFixed(2)
-                          : (recipe?.[key] ?? 0)}
-                      </button>
-                    </div>
-                    <Slider.Control className="slider-control">
-                      <Slider.Track className="slider-track">
-                        <Slider.Indicator className="slider-indicator" />
-                        <Slider.Thumb
-                          className="slider-thumb"
-                          aria-label={label}
-                        />
-                      </Slider.Track>
-                    </Slider.Control>
-                  </Slider.Root>
-                ))}
+                onValueChange={(v) => change("straighten", Number(v))}
+                onValueCommitted={(v) => commit("straighten", Number(v))}
+              >
+                <div className="slider-label">
+                  <Slider.Label>Straighten</Slider.Label>
+                  <span>{(recipe?.straighten ?? 0).toFixed(1)}°</span>
+                </div>
+                <Slider.Control className="slider-control">
+                  <Slider.Track className="slider-track">
+                    <Slider.Indicator className="slider-indicator" />
+                    <Slider.Thumb
+                      className="slider-thumb"
+                      aria-label="Straighten"
+                    />
+                  </Slider.Track>
+                </Slider.Control>
+              </Slider.Root>
+              <label className="number-row">
+                Crop ratio
+                <select
+                  aria-label="Crop aspect ratio"
+                  value={aspect}
+                  onChange={(e) => onAspect(e.target.value)}
+                >
+                  <option value="free">Free</option>
+                  <option value="original">Original</option>
+                  <option value="1">1:1</option>
+                  <option value="1.5">3:2</option>
+                  <option value="1.333333333">4:3</option>
+                  <option value="1.777777778">16:9</option>
+                  <option value="0.8">4:5</option>
+                </select>
+              </label>
+              <label className="crop-lock">
+                <input
+                  type="checkbox"
+                  checked={locked}
+                  onChange={(e) => onLocked(e.target.checked)}
+                />
+                Lock aspect ratio
+              </label>
+              <p className="panel-help muted">
+                Drag crop edges or corners. Rotation keeps the frame inside your
+                photo.
+              </p>
+              <Btn
+                className="wide"
+                disabled={!recipe?.crop}
+                onClick={() => onCommit({ crop: null })}
+              >
+                Reset crop
+              </Btn>
             </details>
-          ))}
+          )}
+          {tab === "Adjustments" &&
+            ["Light", "Color", "Detail"].map((group) => (
+              <details open={group !== "Detail"} key={group}>
+                <summary>{group === "Detail" ? "Details" : group}</summary>
+                {adjustmentControls
+                  .filter((c) => c[5] === group)
+                  .map(([key, label, min, max, step]) => (
+                    <Slider.Root
+                      key={key}
+                      className="adjustment"
+                      disabled={!photo || busy}
+                      min={min}
+                      max={max}
+                      step={step}
+                      value={recipe?.[key] ?? 0}
+                      onValueChange={(value) => change(key, Number(value))}
+                      onValueCommitted={(value) => commit(key, Number(value))}
+                    >
+                      <div className="slider-label">
+                        <Slider.Label>{label}</Slider.Label>
+                        <button
+                          className="value-reset"
+                          title={`Reset ${label}`}
+                          onClick={() => onCommit({ [key]: 0 })}
+                          disabled={!photo || busy}
+                        >
+                          {(recipe?.[key] ?? 0) > 0 ? "+" : ""}
+                          {key === "exposure"
+                            ? (recipe?.[key] ?? 0).toFixed(2)
+                            : (recipe?.[key] ?? 0)}
+                        </button>
+                      </div>
+                      <Slider.Control className="slider-control">
+                        <Slider.Track className="slider-track">
+                          <Slider.Indicator className="slider-indicator" />
+                          <Slider.Thumb
+                            className="slider-thumb"
+                            aria-label={label}
+                          />
+                        </Slider.Track>
+                      </Slider.Control>
+                    </Slider.Root>
+                  ))}
+              </details>
+            ))}
         </fieldset>
-        {photo && (
-          <details>
+        {photo && tab === "Info" && (
+          <details open>
             <summary>File information</summary>
             <dl className="metadata">
               <dt>Name</dt>
@@ -221,23 +297,29 @@ export function Adjustments({
         )}
       </div>
       <div className="adjustments-footer">
-        <Btn disabled={!photo} onClick={() => onAction("copy")}>
+        <Btn
+          aria-label="Copy"
+          title="Copy adjustments"
+          disabled={!photo}
+          onClick={() => onAction("copy")}
+        >
           <Copy size={14} />
-          Copy
         </Btn>
         <Btn
+          aria-label="Paste"
+          title="Paste adjustments"
           disabled={!photo || !copied || busy}
           onClick={() => onAction("paste")}
         >
           <ClipboardPaste size={14} />
-          Paste
         </Btn>
         <Btn
           className="wide"
           disabled={!photo || busy}
           onClick={() => onAction("sync")}
         >
-          Apply to selected photos
+          <Layers size={14} />
+          Apply to selected
         </Btn>
       </div>
     </aside>

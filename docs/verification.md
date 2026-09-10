@@ -43,3 +43,11 @@ LUMAFLUX_EXECUTABLE="$PWD/release/mac-arm64/Lumaflux.app/Contents/MacOS/Lumaflux
 ```
 
 Electron tests use generated color-study fixtures, not user photos. Screenshots and test catalogs are local verification artifacts; test photos are not imported into the user's normal library.
+
+## Workspace revision — 10 September 2026
+
+The updated workspace has separate Adjustments, Composition, and Info tabs, a single viewer toolbar, automatic crop handles with aspect locking, side-by-side original/edited comparison, an inward-cropping straighten algorithm, a filesystem folder browser, and persistent resizable panel widths. Library panels are hidden by default and editing hides file navigation.
+
+42 unit/integration tests pass, including opaque rotation bounds for portrait/landscape images at positive/negative angles through 45 degrees, quarter turns, and all eight locked crop handles at extreme drags. The Electron workflow additionally checks hidden panels, real folder traversal, keyboard panel resizing, isolated Info content, automatic crop handles, distinct comparison images, 1:1 viewing, MCP synchronization, batch export, persistence, and relinking.
+
+The complete revised workflow also passed against the rebuilt `release/mac-arm64/Lumaflux.app`, including the straighten slider and relaunch/relink checks. Screenshots include `composition.png`, `compare.png`, and the minimum-size `compact.png`.

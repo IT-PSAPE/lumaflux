@@ -1069,3 +1069,250 @@ fieldset {
 .notice > .btn {
   pointer-events: auto;
 }
+/* Dense workspace with optional, independently resizable panels. */
+.workspace {
+  display: flex;
+}
+.main-area {
+  flex: 1;
+}
+.navigation {
+  flex: none;
+  min-width: 0;
+}
+.inspector-shell {
+  flex: none;
+  min-width: 0;
+  display: flex;
+}
+.inspector-shell .adjustments {
+  width: 100%;
+  min-width: 0;
+}
+.panel-resizer {
+  flex: 0 0 4px;
+  cursor: col-resize;
+  background: var(--border);
+  touch-action: none;
+}
+.panel-resizer:hover,
+.panel-resizer:focus-visible {
+  background: #f18bb9;
+  outline: none;
+}
+.inspector-tabs {
+  display: flex;
+  border-bottom: 1px solid #363638;
+  height: 36px;
+  flex: none;
+}
+.inspector-tabs button {
+  flex: 1;
+  font-size: 11px;
+  padding: 0 6px;
+  border: 0;
+  background: none;
+  color: #a5a5a8;
+  border-bottom: 2px solid transparent;
+}
+.inspector-tabs button[aria-selected="true"] {
+  color: #f18bb9;
+  border-bottom-color: #f18bb9;
+}
+.adjustments-footer {
+  flex-wrap: nowrap;
+  gap: 4px;
+  padding: 8px;
+}
+.adjustments-footer .wide {
+  width: auto;
+  flex: 1;
+  white-space: nowrap;
+}
+.adjustments-footer .btn {
+  padding: 0 6px;
+  font-size: 10px;
+}
+.viewer-tools {
+  height: 36px;
+  min-height: 36px;
+  padding: 0 8px;
+  gap: 4px;
+  flex: none;
+}
+.viewer-file {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 11px;
+}
+.viewer-file strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 220px;
+  font-weight: 500;
+}
+.viewer-file span {
+  font-size: 10px;
+  white-space: nowrap;
+}
+.canvas {
+  padding: 24px;
+}
+.crop-rectangle {
+  pointer-events: auto;
+  cursor: move;
+  touch-action: none;
+}
+.crop-rectangle i {
+  pointer-events: none;
+}
+.crop-handle {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background: #fff;
+  border: 1px solid #222;
+  padding: 0;
+  border-radius: 0;
+  touch-action: none;
+}
+.handle-n {
+  left: 50%;
+  top: 0;
+  transform: translate(-50%, -50%);
+  cursor: ns-resize;
+}
+.handle-s {
+  left: 50%;
+  bottom: 0;
+  transform: translate(-50%, 50%);
+  cursor: ns-resize;
+}
+.handle-e {
+  right: 0;
+  top: 50%;
+  transform: translate(50%, -50%);
+  cursor: ew-resize;
+}
+.handle-w {
+  left: 0;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  cursor: ew-resize;
+}
+.handle-ne {
+  right: 0;
+  top: 0;
+  transform: translate(50%, -50%);
+  cursor: nesw-resize;
+}
+.handle-nw {
+  left: 0;
+  top: 0;
+  transform: translate(-50%, -50%);
+  cursor: nwse-resize;
+}
+.handle-se {
+  right: 0;
+  bottom: 0;
+  transform: translate(50%, 50%);
+  cursor: nwse-resize;
+}
+.handle-sw {
+  left: 0;
+  bottom: 0;
+  transform: translate(-50%, 50%);
+  cursor: nesw-resize;
+}
+.canvas.comparing {
+  gap: 20px;
+  align-items: stretch;
+}
+.compare-pane {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  overflow: hidden;
+}
+.compare-pane img {
+  max-width: 100%;
+  max-height: calc(100vh - 220px);
+  object-fit: contain;
+  min-height: 0;
+}
+.compare-pane figcaption,
+.compare-label {
+  font-size: 11px;
+  color: #bbb;
+}
+.library-bottom {
+  display: flex;
+  gap: 8px;
+  padding: 6px 10px;
+  border-top: 1px solid #363638;
+}
+.navigation .import-actions {
+  margin-top: auto;
+  flex: none;
+}
+.folder-explorer {
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+}
+.directory-entries {
+  max-height: 35vh;
+  overflow: auto;
+}
+.folder-path {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+.folder-path span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10px;
+}
+.directory-entries .nav-item {
+  font-size: 11px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+@media (max-width: 1150px) {
+  .viewer-file span {
+    display: none;
+  }
+  .viewer-file strong {
+    max-width: 130px;
+  }
+}
+.adjustments-footer > .btn:not(.wide) {
+  flex: 0 0 26px;
+}
+.canvas.cropping {
+  cursor: default;
+}
+.crop-lock {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 10px 0;
+  font-size: 11px;
+}
+.crop-lock input {
+  margin: 0;
+  accent-color: #f18bb9;
+}

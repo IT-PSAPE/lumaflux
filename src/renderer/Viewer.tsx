@@ -1,79 +1,116 @@
 import { useEffect, useRef, useState, type PointerEvent } from "react";
 import {
-  Crop,
   Maximize,
   ZoomIn,
   ZoomOut,
   Columns2,
-  Check,
-  X,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import type { Photo, Recipe } from "../shared/model";
 import { neutralRecipe } from "../shared/model";
 import { Btn } from "./ui";
+import { fullCrop, resizeCrop, type CropBox } from "./crop";
 export function Viewer({
   photo,
   recipe,
   preview,
   onCrop,
   onError,
+  composition,
+  aspect,
+  locked,
+  previous,
+  next,
+  canPrevious,
+  canNext,
 }: {
   photo: Photo;
   recipe: Recipe;
   preview: (id: string, recipe: Recipe, max?: number) => Promise<string>;
   onCrop: (crop: Recipe["crop"]) => void;
   onError: (message: string) => void;
+  composition: boolean;
+  aspect: string;
+  locked: boolean;
+  previous: () => void;
+  next: () => void;
+  canPrevious: boolean;
+  canNext: boolean;
 }) {
-  const [src, setSrc] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [compare, setCompare] = useState(false);
-  const [zoom, setZoom] = useState(1);
-  const [pan, setPan] = useState({ x: 0, y: 0 });
-  const [cropMode, setCropMode] = useState(false);
-  const [crop, setCrop] = useState<Recipe["crop"]>(null);
-  const [aspect, setAspect] = useState("free");
-  const [fullResolution, setFullResolution] = useState(false);
-  const [pixelFit, setPixelFit] = useState(false);
-  const [natural, setNatural] = useState({ width: 1, height: 1 });
-  const stage = useRef<HTMLDivElement>(null);
-  const img = useRef<HTMLImageElement>(null);
-  const sequence = useRef(0);
+  const [src, setSrc] = useState(""),
+    [original, setOriginal] = useState(""),
+    [compare, setCompare] = useState(false),
+    [loading, setLoading] = useState(false);
+  const [zoom, setZoom] = useState(1),
+    [pan, setPan] = useState({ x: 0, y: 0 }),
+    [full, setFull] = useState(false);
+  const [crop, setCrop] = useState<CropBox>(recipe.crop ?? fullCrop);
+  const img = useRef<HTMLImageElement>(null),
+    serial = useRef(0),
+    pixelFit = useRef(false);
   const drag = useRef<{
     x: number;
     y: number;
-    panX: number;
-    panY: number;
     rect: DOMRect;
+    box: CropBox;
+    handle: string;
+    ratio: number;
+    pan: typeof pan;
   } | null>(null);
+  const cropRef = useRef(crop);
+  cropRef.current = crop;
+  const lastAspect = useRef(aspect);
+  useEffect(() => {
+    setCrop(recipe.crop ?? fullCrop);
+  }, [photo.id, JSON.stringify(recipe.crop)]);
   useEffect(() => {
     setZoom(1);
     setPan({ x: 0, y: 0 });
-    setCropMode(false);
-    setCrop(null);
-    setSrc("");
-    setFullResolution(false);
-    setPixelFit(false);
-  }, [photo.id]);
+    setCompare(false);
+    setFull(false);
+    setOriginal("");
+  }, [photo.id, composition]);
+  useEffect(() => {
+    if (lastAspect.current === aspect) return;
+    lastAspect.current = aspect;
+    if (!composition || aspect === "free" || !img.current) return;
+    const ratio =
+      aspect === "original"
+        ? 1
+        : (Number(aspect) * img.current.naturalHeight) /
+          img.current.naturalWidth;
+    const width = Math.min(1, ratio),
+      height = Math.min(1, 1 / ratio);
+    const box = { x: (1 - width) / 2, y: (1 - height) / 2, width, height };
+    setCrop(box);
+    onCrop(box);
+  }, [aspect, composition]);
   useEffect(() => {
     let alive = true;
-    const serial = ++sequence.current;
+    const id = ++serial.current;
     setLoading(true);
-    const timer = setTimeout(() => {
-      const current = compare
-        ? neutralRecipe()
-        : cropMode
-          ? { ...recipe, crop: null }
-          : recipe;
-      preview(photo.id, current, fullResolution ? 20000 : 2000)
-        .then((result) => {
-          if (alive && serial === sequence.current) setSrc(result);
-        })
-        .catch((e) => {
-          if (alive && !String(e).includes("SUPERSEDED")) onError(String(e));
-        })
-        .finally(() => {
-          if (alive && serial === sequence.current) setLoading(false);
-        });
+    const timer = setTimeout(async () => {
+      try {
+        // Sequential requests respect the shared renderer's latest-preview queue.
+        const before = compare
+          ? await preview(photo.id, neutralRecipe(), 2000)
+          : "";
+        if (!alive) return;
+        const after = await preview(
+          photo.id,
+          composition && !compare ? { ...recipe, crop: null } : recipe,
+          full ? 20000 : 2000,
+        );
+        if (alive && serial.current === id) {
+          setOriginal(before);
+          setSrc(after);
+        }
+      } catch (e) {
+        if (alive && !String(e).includes("SUPERSEDED")) onError(String(e));
+      } finally {
+        if (alive) setLoading(false);
+      }
     }, 75);
     return () => {
       alive = false;
@@ -84,208 +121,183 @@ export function Viewer({
     photo.revision,
     JSON.stringify(recipe),
     compare,
-    cropMode,
-    fullResolution,
+    composition,
+    full,
   ]);
-  function pointerDown(e: PointerEvent<HTMLDivElement>) {
+  function down(e: PointerEvent<HTMLDivElement>) {
     if (e.button !== 0 || !img.current) return;
-    const rect = img.current.getBoundingClientRect();
-    if (
-      cropMode &&
-      (e.clientX < rect.left ||
-        e.clientX > rect.right ||
-        e.clientY < rect.top ||
-        e.clientY > rect.bottom)
-    )
-      return;
+    const handle = (e.target as HTMLElement).closest<HTMLElement>(
+      "[data-handle]",
+    )?.dataset.handle;
+    if (composition && !compare && !handle) return;
+    const box = cropRef.current;
     drag.current = {
       x: e.clientX,
       y: e.clientY,
-      panX: pan.x,
-      panY: pan.y,
-      rect,
+      rect: img.current.getBoundingClientRect(),
+      box,
+      handle: handle ?? "pan",
+      ratio: locked ? box.width / box.height : 0,
+      pan,
     };
     e.currentTarget.setPointerCapture(e.pointerId);
-    if (cropMode) setCrop(null);
+    e.preventDefault();
   }
-  function pointerMove(e: PointerEvent<HTMLDivElement>) {
+  function move(e: PointerEvent<HTMLDivElement>) {
     const d = drag.current;
     if (!d) return;
-    if (!cropMode) {
-      setPan({ x: d.panX + e.clientX - d.x, y: d.panY + e.clientY - d.y });
-      return;
+    if (d.handle === "pan")
+      setPan({ x: d.pan.x + e.clientX - d.x, y: d.pan.y + e.clientY - d.y });
+    else {
+      const box = resizeCrop(
+        d.box,
+        d.handle,
+        (e.clientX - d.x) / d.rect.width,
+        (e.clientY - d.y) / d.rect.height,
+        d.ratio,
+      );
+      cropRef.current = box;
+      setCrop(box);
     }
-    const x0 = Math.max(0, Math.min(1, (d.x - d.rect.left) / d.rect.width));
-    const y0 = Math.max(0, Math.min(1, (d.y - d.rect.top) / d.rect.height));
-    const x1 = Math.max(
-      0,
-      Math.min(1, (e.clientX - d.rect.left) / d.rect.width),
-    );
-    const y1 = Math.max(
-      0,
-      Math.min(1, (e.clientY - d.rect.top) / d.rect.height),
-    );
-    let w = Math.abs(x1 - x0),
-      h = Math.abs(y1 - y0);
-    const ratio =
-      aspect === "free"
-        ? 0
-        : aspect === "original"
-          ? natural.width / natural.height
-          : Number(aspect);
-    if (ratio) {
-      h = (w * d.rect.width) / (ratio * d.rect.height);
-      const maxH = y1 >= y0 ? 1 - y0 : y0;
-      if (h > maxH) {
-        h = maxH;
-        w = (h * ratio * d.rect.height) / d.rect.width;
-      }
-    }
-    const x = x1 >= x0 ? x0 : x0 - w;
-    const y = y1 >= y0 ? y0 : y0 - h;
-    if (w > 0.001 && h > 0.001) setCrop({ x, y, width: w, height: h });
   }
-  const actual = () => {
-    setFullResolution(true);
-    setPixelFit(true);
-    if (img.current) {
-      const rect = img.current.getBoundingClientRect();
-      setZoom(img.current.naturalWidth / (rect.width / zoom));
-      setPan({ x: 0, y: 0 });
-      if (fullResolution) setPixelFit(false);
-    }
-  };
+  function fit() {
+    pixelFit.current = false;
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+  }
   return (
     <div className="viewer">
       <div className="viewer-tools">
+        <div className="viewer-file">
+          <strong>{photo.name}</strong>
+          <span className="muted">
+            {photo.width} × {photo.height}
+          </span>
+        </div>
         <Btn
-          className={cropMode ? "active" : ""}
+          aria-label="Previous photo"
+          disabled={!canPrevious}
+          onClick={previous}
+        >
+          <ChevronLeft size={14} />
+        </Btn>
+        <Btn aria-label="Next photo" disabled={!canNext} onClick={next}>
+          <ChevronRight size={14} />
+        </Btn>
+        <span className="spacer" />
+        <Btn
+          aria-pressed={compare}
+          className={compare ? "active" : ""}
           onClick={() => {
-            setCropMode(!cropMode);
-            setCompare(false);
-            setZoom(1);
-            setPan({ x: 0, y: 0 });
-            setCrop(null);
+            setCompare(!compare);
+            fit();
           }}
         >
-          <Crop size={16} />
-          Crop
+          <Columns2 size={14} />
+          Compare
         </Btn>
-        {cropMode ? (
-          <>
-            <select
-              aria-label="Crop aspect ratio"
-              value={aspect}
-              onChange={(e) => {
-                setAspect(e.target.value);
-                setCrop(null);
-              }}
-            >
-              <option value="free">Free ratio</option>
-              <option value="original">Original</option>
-              <option value="1">1:1</option>
-              <option value="1.5">3:2</option>
-              <option value="1.333333333">4:3</option>
-              <option value="1.777777778">16:9</option>
-              <option value="0.8">4:5</option>
-            </select>
-            <Btn
-              disabled={!crop}
-              onClick={() => {
-                onCrop(crop);
-                setCropMode(false);
-              }}
-            >
-              <Check size={15} />
-              Apply crop
-            </Btn>
-            <Btn aria-label="Cancel crop" onClick={() => setCropMode(false)}>
-              <X size={15} />
-            </Btn>
-          </>
-        ) : (
-          <>
-            <Btn
-              className={compare ? "active" : ""}
-              onClick={() => setCompare(!compare)}
-            >
-              <Columns2 size={16} />
-              {compare ? "Original" : "Compare"}
-            </Btn>
-            <span className="spacer" />
-            <Btn
-              aria-label="Zoom out"
-              onClick={() => setZoom((v) => Math.max(0.25, v / 1.25))}
-            >
-              <ZoomOut size={16} />
-            </Btn>
-            <span className="zoom-label">{Math.round(zoom * 100)}%</span>
-            <Btn
-              aria-label="Zoom in"
-              onClick={() => setZoom((v) => Math.min(8, v * 1.25))}
-            >
-              <ZoomIn size={16} />
-            </Btn>
-            <Btn onClick={actual}>1:1</Btn>
-            <Btn
-              onClick={() => {
-                setPixelFit(false);
-                setZoom(1);
-                setPan({ x: 0, y: 0 });
-              }}
-            >
-              <Maximize size={15} />
-              Fit
-            </Btn>
-          </>
-        )}
+        <Btn
+          aria-label="Zoom out"
+          disabled={composition || compare}
+          onClick={() => setZoom((z) => Math.max(0.25, z / 1.25))}
+        >
+          <ZoomOut size={14} />
+        </Btn>
+        <span className="zoom-label">{Math.round(zoom * 100)}%</span>
+        <Btn
+          aria-label="Zoom in"
+          disabled={composition || compare}
+          onClick={() => setZoom((z) => Math.min(8, z * 1.25))}
+        >
+          <ZoomIn size={14} />
+        </Btn>
+        <Btn
+          disabled={composition || compare}
+          onClick={() => {
+            pixelFit.current = true;
+            setFull(true);
+            if (img.current) {
+              setZoom(
+                img.current.naturalWidth /
+                  (img.current.getBoundingClientRect().width / zoom),
+              );
+              if (full) pixelFit.current = false;
+            }
+          }}
+        >
+          1:1
+        </Btn>
+        <Btn onClick={fit}>
+          <Maximize size={14} />
+          Fit
+        </Btn>
       </div>
       <div
-        className={`canvas ${cropMode ? "cropping" : ""}`}
-        ref={stage}
-        onPointerDown={pointerDown}
-        onPointerMove={pointerMove}
+        className={`canvas ${composition && !compare ? "cropping" : ""} ${compare ? "comparing" : ""}`}
+        onPointerDown={down}
+        onPointerMove={move}
         onPointerUp={() => {
+          if (
+            drag.current &&
+            drag.current.handle !== "pan" &&
+            JSON.stringify(drag.current.box) !== JSON.stringify(cropRef.current)
+          )
+            onCrop(cropRef.current);
           drag.current = null;
         }}
         onPointerCancel={() => {
           drag.current = null;
+          setCrop(recipe.crop ?? fullCrop);
         }}
         onWheel={(e) => {
-          if (!cropMode)
+          if (!composition && !compare)
             setZoom((z) =>
               Math.max(0.25, Math.min(8, z * (e.deltaY > 0 ? 0.9 : 1.1))),
             );
         }}
       >
+        {compare && original && (
+          <figure className="compare-pane">
+            <figcaption>Original</figcaption>
+            <img
+              src={original}
+              alt={`Original ${photo.name}`}
+              draggable={false}
+            />
+          </figure>
+        )}
         {src ? (
           <div
-            className="image-wrap"
-            style={{
-              transform: `translate(${pan.x}px,${pan.y}px) scale(${zoom})`,
-            }}
+            className={compare ? "compare-pane" : "image-wrap"}
+            style={
+              compare
+                ? undefined
+                : {
+                    transform: `translate(${pan.x}px,${pan.y}px) scale(${zoom})`,
+                  }
+            }
           >
+            {compare && <div className="compare-label">Edited</div>}
             <img
               ref={img}
               src={src}
+              alt={compare ? `Edited ${photo.name}` : photo.name}
               draggable={false}
-              alt={photo.name}
               onLoad={(e) => {
-                setNatural({
-                  width: e.currentTarget.naturalWidth,
-                  height: e.currentTarget.naturalHeight,
-                });
-                if (pixelFit) {
-                  const rect = e.currentTarget.getBoundingClientRect();
-                  setZoom(e.currentTarget.naturalWidth / (rect.width / zoom));
+                if (pixelFit.current) {
+                  setZoom(
+                    e.currentTarget.naturalWidth /
+                      (e.currentTarget.getBoundingClientRect().width / zoom),
+                  );
                   setPan({ x: 0, y: 0 });
-                  setPixelFit(false);
+                  pixelFit.current = false;
                 }
               }}
             />
-            {cropMode && crop && (
+            {composition && !compare && (
               <div
                 className="crop-rectangle"
+                data-handle="move"
                 style={{
                   left: `${crop.x * 100}%`,
                   top: `${crop.y * 100}%`,
@@ -295,6 +307,41 @@ export function Viewer({
               >
                 <i />
                 <i />
+                {["n", "ne", "e", "se", "s", "sw", "w", "nw"].map((h) => (
+                  <button
+                    key={h}
+                    data-handle={h}
+                    className={`crop-handle handle-${h}`}
+                    aria-label={`Resize crop ${h}`}
+                    onKeyDown={(e) => {
+                      const delta = e.shiftKey ? 0.02 : 0.005;
+                      const dx =
+                        e.key === "ArrowLeft"
+                          ? -delta
+                          : e.key === "ArrowRight"
+                            ? delta
+                            : 0;
+                      const dy =
+                        e.key === "ArrowUp"
+                          ? -delta
+                          : e.key === "ArrowDown"
+                            ? delta
+                            : 0;
+                      if (dx || dy) {
+                        e.preventDefault();
+                        onCrop(
+                          resizeCrop(
+                            crop,
+                            h,
+                            dx,
+                            dy,
+                            locked ? crop.width / crop.height : 0,
+                          ),
+                        );
+                      }
+                    }}
+                  />
+                ))}
               </div>
             )}
           </div>
@@ -306,18 +353,6 @@ export function Viewer({
           </p>
         )}
         {loading && <span className="canvas-status">Rendering…</span>}
-        {compare && <span className="original-label">Original</span>}
-        {cropMode && (
-          <span className="canvas-hint">
-            Drag across the image to choose a crop
-          </span>
-        )}
-      </div>
-      <div className="viewer-caption">
-        <span>{photo.name}</span>
-        <span>
-          {photo.width} × {photo.height} · {photo.format.toUpperCase()}
-        </span>
       </div>
     </div>
   );

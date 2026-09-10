@@ -25,7 +25,7 @@ On this Mac, the local application is generated at `release/mac-arm64/Lumaflux.a
 - Browse the gallery by folder, filename, favorites, or minimum star rating. Sort by name, file modification date, or rating. Change thumbnail density at the bottom.
 - Click to select, Command/Ctrl-click to toggle selection, Shift-click for a range. Double-click to edit; the filmstrip navigates between photos.
 - Adjust exposure, brightness, contrast, highlights, shadows, whites, blacks, temperature, tint, hue, saturation, vibrance, sharpening, and vignette. Click an adjustment's number to reset that control.
-- Rotate, flip, straighten, or drag a crop with an optional aspect ratio. Geometry changes clear the previous crop. Compare shows the untouched original. Fit, zoom, 1:1, and drag-to-pan are available in the viewer.
+- Use the Composition tab to rotate, flip, straighten, and resize the always-visible crop frame with its eight handles. Lock its aspect ratio or choose a preset. Straightening automatically crops inward to keep the result inside the image. Geometry changes clear the previous crop. Compare shows the untouched original beside the edited result. Fit, zoom, 1:1, and drag-to-pan are available in the viewer.
 - Undo/redo retains up to 100 committed changes per photo across launches. Copy/paste and “Apply to selected photos” transfer light/color/detail adjustments while preserving each photo's geometry.
 - Export the selected batch as JPEG, PNG, or WebP, optionally resized. Jobs show progress, outputs, and individual errors. Cancel stops remaining work. Existing outputs get unique filenames. Export history is session-only.
 - If an original moves, choose “Relink original file” in File information. Missing files are detected when the catalog opens.
@@ -94,3 +94,5 @@ LUMAFLUX_EXECUTABLE="$PWD/release/mac-arm64/Lumaflux.app/Contents/MacOS/Lumaflux
 ```
 
 Research and architectural decisions are in [docs/research/architecture-references.md](docs/research/architecture-references.md). Original implementation; no code was copied from the photo editor reference projects.
+
+Library mode keeps panels hidden by default. Use Folders at the bottom to explore local directories and import photos; drag the panel divider to resize it. Edit mode shows the resizable Adjustments / Composition / Info inspector. Copy and paste icons share one row with Apply to selected.

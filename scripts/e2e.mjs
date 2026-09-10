@@ -75,6 +75,32 @@ try {
     ),
   );
   await page.getByRole("button", { name: "Dismiss notification" }).click();
+  assert.equal(await page.locator(".adjustments").count(), 0);
+  assert.equal(await page.locator(".navigation").count(), 0);
+  await page.getByRole("button", { name: "Folders", exact: true }).click();
+  await app.evaluate(({ dialog }, folder) => {
+    dialog.showOpenDialog = async () => ({
+      canceled: false,
+      filePaths: [folder],
+    });
+  }, temp);
+  await page
+    .getByRole("button", { name: "Explore folders", exact: true })
+    .click();
+  await page.getByRole("button", { name: "exports", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Parent folder", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Import this folder", exact: true })
+    .waitFor();
+  const left = await page.locator(".navigation").boundingBox();
+  await page.getByRole("separator", { name: "Resize left panel" }).focus();
+  await page.keyboard.press("ArrowRight");
+  assert.ok(
+    (await page.locator(".navigation").boundingBox()).width > left.width,
+  );
+  await page.getByRole("button", { name: "Folders", exact: true }).click();
   await page.screenshot({ path: "output/playwright/gallery.png" });
   await page
     .getByRole("button", { name: "Favorite color-study.png", exact: true })
@@ -86,6 +112,19 @@ try {
     .getByRole("button", { name: "Select color-study.png", exact: true })
     .dblclick();
   await page.locator(".image-wrap img").waitFor();
+  const right = await page.locator(".inspector-shell").boundingBox();
+  await page.getByRole("separator", { name: "Resize right panel" }).focus();
+  await page.keyboard.press("ArrowLeft");
+  assert.ok(
+    (await page.locator(".inspector-shell").boundingBox()).width > right.width,
+  );
+  await page.getByRole("tab", { name: "Info", exact: true }).click();
+  await page.getByText("File information", { exact: true }).waitFor();
+  assert.equal(
+    await page.getByRole("slider", { name: "Exposure", exact: true }).count(),
+    0,
+  );
+  await page.getByRole("tab", { name: "Adjustments", exact: true }).click();
   await page.getByRole("slider", { name: "Exposure", exact: true }).focus();
   await page.keyboard.press("ArrowRight");
   await poll(() =>
@@ -100,6 +139,9 @@ try {
     window.lumaflux.command("get_app_state"),
   );
   const id = state.photos.find((p) => p.name === "color-study.png").id;
+  assert.equal(await page.locator(".navigation").count(), 0);
+  assert.equal(await page.locator(".library-toolbar").count(), 0);
+  await page.getByRole("tab", { name: "Composition", exact: true }).click();
   await page.getByRole("button", { name: "Rotate right", exact: true }).click();
   await poll(() =>
     page.evaluate(
@@ -109,7 +151,7 @@ try {
       id,
     ),
   );
-  await page.getByRole("button", { name: "Crop", exact: true }).click();
+  await page.getByLabel("Lock aspect ratio").check();
   await page.waitForFunction(
     () =>
       document.querySelector(".image-wrap img")?.complete &&
@@ -117,10 +159,7 @@ try {
   );
   const image = await page.locator(".image-wrap img").boundingBox();
   assert.ok(image && image.width > 0);
-  await page.mouse.move(
-    image.x + image.width * 0.1,
-    image.y + image.height * 0.1,
-  );
+  await page.mouse.move(image.x + image.width, image.y + image.height);
   await page.mouse.down();
   await page.mouse.move(
     image.x + image.width * 0.8,
@@ -128,7 +167,7 @@ try {
     { steps: 5 },
   );
   await page.mouse.up();
-  await page.getByRole("button", { name: "Apply crop", exact: true }).click();
+
   await poll(() =>
     page.evaluate(
       async (id) =>
@@ -153,9 +192,30 @@ try {
       id,
     ),
   );
+  await page.screenshot({ path: "output/playwright/composition.png" });
+  await page.getByRole("slider", { name: "Straighten", exact: true }).focus();
+  await page.keyboard.press("ArrowRight");
+  await poll(() =>
+    page.evaluate(
+      async (id) =>
+        (await window.lumaflux.command("get_photo", { id })).recipe.straighten >
+        0,
+      id,
+    ),
+  );
   await page.getByRole("button", { name: "Compare", exact: true }).click();
-  await page.getByText("Original", { exact: true }).last().waitFor();
-  await page.getByRole("button", { name: "Original", exact: true }).click();
+  await page.locator(".compare-pane figcaption").waitFor();
+  await page.waitForFunction(() => {
+    const images = [...document.querySelectorAll(".compare-pane img")];
+    return (
+      images.length === 2 &&
+      images.every((img) => img.complete) &&
+      images[0].src !== images[1].src
+    );
+  });
+  await page.screenshot({ path: "output/playwright/compare.png" });
+  await page.getByRole("button", { name: "Compare", exact: true }).click();
+  await page.getByRole("tab", { name: "Adjustments", exact: true }).click();
   await page.getByRole("button", { name: "Zoom in", exact: true }).click();
   await page.getByRole("button", { name: "1:1", exact: true }).click();
   await page.waitForFunction(() => {
@@ -172,7 +232,9 @@ try {
   );
   assert.ok(
     await page.evaluate(
-      () => document.documentElement.scrollWidth <= window.innerWidth && document.documentElement.scrollHeight <= window.innerHeight,
+      () =>
+        document.documentElement.scrollWidth <= window.innerWidth &&
+        document.documentElement.scrollHeight <= window.innerHeight,
     ),
   );
   await page.screenshot({ path: "output/playwright/compact.png" });
@@ -251,8 +313,9 @@ try {
   assert.equal(pasted.recipe.crop, null);
   await page.getByRole("button", { name: "Library", exact: true }).click();
   await page.getByRole("button", { name: "Select all", exact: true }).click();
+  await page.getByRole("button", { name: "Edit", exact: true }).click();
   await page
-    .getByRole("button", { name: "Apply to selected photos", exact: true })
+    .getByRole("button", { name: "Apply to selected", exact: true })
     .click();
   await poll(() =>
     page.evaluate(async () => {
