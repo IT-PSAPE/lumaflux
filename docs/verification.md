@@ -30,7 +30,7 @@ The final audit added tests/fixes for Zod defaults resetting unrelated patch val
 
 ## Scope limits
 
-Standard raster inputs, 8-bit sRGB processing, no camera RAW development or advanced masks/layers. Export job history is session-only. Only Apple Silicon macOS packaging is verified. Local build is unsigned and not notarized. Production dependency audit reported no known vulnerabilities at verification time. Large-catalog and maximum-size performance has not been benchmarked.
+Standard raster inputs, 8-bit sRGB processing, no camera RAW development or advanced masks/layers. Export job history is session-only. Release 0.10.0.1 packaging and packaged-app workflows are verified on Windows x64, Ubuntu Linux x64, macOS Intel, and macOS Apple Silicon. Local build is unsigned and not notarized. Production dependency audit reported no known vulnerabilities at verification time. Large-catalog and maximum-size performance has not been benchmarked.
 
 ## Reproduce
 
@@ -63,3 +63,13 @@ The canvas no longer debounces until dragging pauses or rerenders crop-only chan
 44 tests cover previous behavior plus cache byte limits, eviction, source replacement invalidation, and pixel isolation across cached edits. The Electron workflow confirms a changed canvas image while the slider pointer is still held, the restored sidebar, toolbar history controls, crop/compare, MCP edits, exports, and relaunch/relink.
 
 The same complete desktop workflow passed against the rebuilt packaged app after this performance revision, including live slider feedback before pointer release and source-byte preservation after export.
+
+## Public release 0.10.0.1
+
+- Repository: https://github.com/IT-PSAPE/lumaflux
+- Release: https://github.com/IT-PSAPE/lumaflux/releases/tag/v0.10.0.1
+- Successful workflow: https://github.com/IT-PSAPE/lumaflux/actions/runs/34460405320
+- Released source: `5f3fc1350347a0dcdf9a0b5cd05d3ddf12d05145`
+- All four matrix jobs passed type checking, 45 tests, packaging, and the complete packaged-app smoke workflow. The version and publishing jobs also passed. No CI repairs were needed in this run.
+- Published Windows x64 NSIS installer; macOS arm64/x64 DMG and ZIP; Linux x64 AppImage and Debian package. Verified all seven download digests against the published `SHA256SUMS.txt` using GitHub's asset digest metadata.
+- Release is public, not a draft; its tag points to the verified source commit. Updating the root `release.yaml` version on main triggers the next release.
