@@ -21,7 +21,7 @@ On this Mac, the local application is generated at `release/mac-arm64/Lumaflux.a
 
 ## Photo workflow
 
-- Import files, multiple files, folders, or drag files/folders into the window. Supported: JPEG, PNG, WebP, single-page TIFF. References stay in their original folders.
+- Import files, multiple files, folders, or drag files/folders into the window. Supported: JPEG, PNG, WebP, single-page TIFF, and camera RAW (including DNG, CR2/CR3, NEF/NRW, ARW, RAF, ORF, RW2 and PEF). References stay in their original folders.
 - Browse the gallery by folder, filename, favorites, or minimum star rating. Sort by name, file modification date, or rating. Change thumbnail density at the bottom.
 - Click to select, Command/Ctrl-click to toggle selection, Shift-click for a range. Double-click to edit; the filmstrip navigates between photos.
 - Adjust exposure, brightness, contrast, highlights, shadows, whites, blacks, temperature, tint, hue, saturation, vibrance, sharpening, and vignette. Click an adjustment's number to reset that control.
@@ -74,7 +74,7 @@ The catalog and settings live in Electron's user-data directory (`~/Library/Appl
 
 Rendering uses Sharp and a shared pixel stage in two worker threads. Preview requests coalesce to the newest waiting draft; thumbnails have a bounded in-memory cache. Originals are oriented from EXIF, transformed, cropped, converted to sRGB, adjusted, and encoded. Exposure operates in linear light. Temperature/tint are relative artistic controls; positive tint adds magenta. Crops are normalized in the transformed image coordinates.
 
-Current limits: 80 million input pixels, 10,000 files per import scan, 500 photos per edit/export batch, 16 simultaneous HTTP agent sessions. The first release processes raster channels at 8-bit precision and exports sRGB without EXIF/GPS metadata. Camera RAW development, layers, masks, healing, and Lightroom catalog compatibility are not included. Large-catalog performance beyond these bounds has not been benchmarked.
+Current limits: 80 million input pixels, 10,000 files per import scan, 500 photos per edit/export batch, 16 simultaneous HTTP agent sessions. The first release processes raster channels at 8-bit precision and exports sRGB without EXIF/GPS metadata. RAW files are developed locally with LibRaw using camera white balance, full-resolution demosaicing, and sRGB output before entering the existing 8-bit editing pipeline. RAW originals remain untouched; export produces JPEG, PNG or WebP, not a modified RAW file. Temperature/tint remain relative artistic controls, not sensor-level white balance. Camera and compression support depends on the bundled LibRaw build; unsupported or damaged files report individual import errors. RAW input is limited to 512 MB and 80 million sensor pixels. Layers, masks, healing, and Lightroom catalog compatibility are not included. Large-catalog performance beyond these bounds has not been benchmarked.
 
 ## Verification
 
@@ -102,3 +102,5 @@ Preview rendering caches downsampled sources and geometry within per-worker byte
 ## Releases
 
 Download desktop installers from [GitHub Releases](https://github.com/IT-PSAPE/lumaflux/releases). Releases are built from the version in `release.yaml`. See [the release process](docs/releases.md) for platforms, version mapping, validation, and retry instructions.
+
+RAW decoding uses [LibRaw-Wasm](https://github.com/ybouane/LibRaw-Wasm) 1.6.0, bundled locally (no external converter installation or network required). Its WebAssembly engine runs in disposable workers; developed sources are cached within a 128 MB limit per rendering context and invalidated when originals change.

@@ -1,3 +1,4 @@
+import { imageExtensions } from "../shared/formats.js";
 import { app, BrowserWindow, ipcMain, dialog, protocol } from "electron";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -217,7 +218,7 @@ if (!app.requestSingleInstanceLock()) {
                 : [
                     {
                       name: "Photos",
-                      extensions: ["jpg", "jpeg", "png", "webp", "tif", "tiff"],
+                      extensions: imageExtensions,
                     },
                   ],
             })
@@ -241,7 +242,7 @@ if (!app.requestSingleInstanceLock()) {
               filters: [
                 {
                   name: "Photos",
-                  extensions: ["jpg", "jpeg", "png", "webp", "tif", "tiff"],
+                  extensions: imageExtensions,
                 },
               ],
             })

@@ -1,3 +1,4 @@
+import { importFormats } from "../shared/formats.js";
 import { createServer, type Server } from "node:http";
 import { randomUUID, timingSafeEqual } from "node:crypto";
 import { realpath } from "node:fs/promises";
@@ -102,8 +103,9 @@ export function createMcpServer(commands: Commands, roots: string[]) {
     true,
     async () =>
       json({
-        formats: ["jpeg", "png", "webp", "tiff"],
-        raw: false,
+        formats: importFormats,
+        raw: true,
+        exportFormats: ["jpeg", "png", "webp"],
         controls: adjustmentControls,
         geometry: {
           rotation: "0–3 quarter turns",

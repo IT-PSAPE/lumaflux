@@ -1,3 +1,4 @@
+import { copyFile } from "node:fs/promises";
 import { build } from "esbuild";
 import { build as viteBuild } from "vite";
 await build({
@@ -29,3 +30,5 @@ await build({
   },
 });
 await viteBuild();
+
+await copyFile("src/imaging/raw-decoder.mjs", "dist/imaging/raw-decoder.mjs");

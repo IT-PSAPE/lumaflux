@@ -724,7 +724,7 @@ export function App() {
                       Import photos
                     </Btn>
                   )}
-                  <span>JPEG · PNG · WebP · TIFF</span>
+                  <span>JPEG · PNG · WebP · TIFF · RAW</span>
                 </div>
               )}
             </>

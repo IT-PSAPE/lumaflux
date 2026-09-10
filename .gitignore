@@ -8,3 +8,4 @@ playwright-report/
 *.log
 
 output/playwright/
+output/raw-smoke/

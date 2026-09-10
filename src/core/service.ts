@@ -25,7 +25,8 @@ import {
 } from "../shared/model.js";
 import { inspectImage } from "../imaging/render.js";
 
-const extensions = new Set([".jpg", ".jpeg", ".png", ".webp", ".tif", ".tiff"]);
+import { imageExtensions } from "../shared/formats.js";
+const extensions = new Set(imageExtensions.map((ext) => `.${ext}`));
 const idSchema = z.string().min(1).max(100);
 const editSchema = z
   .array(
@@ -171,7 +172,7 @@ export class PhotoService extends EventEmitter {
           errors.push({
             path: input,
             message:
-              "Unsupported format. Choose JPEG, PNG, WebP or single-page TIFF.",
+              "Unsupported format. Choose JPEG, PNG, WebP, single-page TIFF or camera RAW.",
           });
       } catch (e) {
         errors.push({ path: input, message: (e as Error).message });

@@ -1,5 +1,6 @@
 import { readdir, realpath } from "node:fs/promises";
 import path from "node:path";
+import { imageExtensions } from "../shared/formats.js";
 import { z } from "zod";
 import { PhotoService } from "./service.js";
 import { ExportManager, type Renderer } from "./export.js";
@@ -41,7 +42,11 @@ export class Commands {
             .map(item),
           files: entries
             .filter(
-              (e) => e.isFile() && /\.(jpe?g|png|webp|tiff?)$/i.test(e.name),
+              (e) =>
+                e.isFile() &&
+                imageExtensions.includes(
+                  path.extname(e.name).slice(1).toLowerCase(),
+                ),
             )
             .sort((a, b) => a.name.localeCompare(b.name))
             .map(item),

@@ -1,3 +1,5 @@
+import { isRawFile } from "../shared/formats.js";
+import { decodeRaw } from "./raw.js";
 import sharp, { type OutputInfo } from "sharp";
 import { ByteCache } from "./cache.js";
 type RawImage = { data: Buffer; info: OutputInfo };
@@ -34,6 +36,16 @@ async function metadata(file: string) {
   return meta;
 }
 export async function inspectImage(file: string): Promise<ImageInfo> {
+  if (isRawFile(file)) {
+    const raw = await decodeRaw(file);
+    return {
+      width: raw.width,
+      height: raw.height,
+      format: file.split(".").pop()!.toLowerCase(),
+      size: (await stat(file)).size,
+      metadata: raw.metadata,
+    };
+  }
   const m = await metadata(file);
   const s = await stat(file);
   const swap = [5, 6, 7, 8].includes(m.orientation ?? 1);
@@ -192,7 +204,7 @@ export async function renderImage(
   recipe: Recipe,
   options: RenderOptions = {},
 ): Promise<Buffer> {
-  await metadata(file);
+  if (!isRawFile(file)) await metadata(file);
   const r = recipeSchema.parse(recipe);
   const opts = z
     .object({
@@ -262,7 +274,18 @@ async function prepare(
   const sourceKey = `${stamp}:${edge}`;
   let raw = opts.preview ? sourceCache.get(sourceKey) : undefined;
   if (!raw) {
-    let decoded = sharp(file, { limitInputPixels: MAX_PIXELS, failOn: "error" })
+    const cameraRaw = isRawFile(file) ? await decodeRaw(file) : undefined;
+    let decoded = (
+      cameraRaw
+        ? sharp(cameraRaw.data, {
+            raw: {
+              width: cameraRaw.width,
+              height: cameraRaw.height,
+              channels: 3,
+            },
+          })
+        : sharp(file, { limitInputPixels: MAX_PIXELS, failOn: "error" })
+    )
       .autoOrient()
       .toColourspace("srgb")
       .ensureAlpha();
