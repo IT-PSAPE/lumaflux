@@ -37,10 +37,12 @@ await sharp(pixels, { raw: { width: 1200, height: 800, channels: 3 } })
   .png()
   .toFile(source2);
 const original = await readFile(source);
+const sandboxArgs =
+  process.env.LUMAFLUX_E2E_NO_SANDBOX === "1" ? ["--no-sandbox"] : [];
 const launchOptions = {
   ...(process.env.LUMAFLUX_EXECUTABLE
-    ? { executablePath: process.env.LUMAFLUX_EXECUTABLE, args: [] }
-    : { args: ["."] }),
+    ? { executablePath: process.env.LUMAFLUX_EXECUTABLE, args: sandboxArgs }
+    : { args: [".", ...sandboxArgs] }),
   env: { ...process.env, LUMAFLUX_DATA_DIR: path.join(temp, "data") },
   timeout: 30000,
 };

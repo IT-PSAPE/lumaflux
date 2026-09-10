@@ -1,6 +1,6 @@
 {
   "name": "lumaflux",
-  "version": "0.1.0",
+  "version": "0.10.0+1",
   "private": true,
   "type": "module",
   "main": "dist/electron/main.js",
@@ -14,7 +14,8 @@
     "test": "tsx --test tests/*.test.ts",
     "test:e2e": "npm run build && node scripts/e2e.mjs",
     "package": "npm run build && electron-builder --dir",
-    "mcp": "node dist/mcp/stdio.js"
+    "mcp": "node dist/mcp/stdio.js",
+    "package:release": "npm run build && electron-builder --config electron-builder.release.cjs --publish never"
   },
   "dependencies": {
     "@base-ui/react": "1.8.0",
@@ -66,5 +67,10 @@
         "to": "mcp/stdio.mjs"
       }
     ]
+  },
+  "homepage": "https://github.com/IT-PSAPE/lumaflux",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/IT-PSAPE/lumaflux.git"
   }
 }

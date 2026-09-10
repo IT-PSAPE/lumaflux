@@ -1,0 +1,142 @@
+name: Desktop release
+on:
+  push:
+    branches: [main]
+    paths:
+      - release.yaml
+      - .github/workflows/release.yml
+      - electron-builder.release.cjs
+      - scripts/release-*.cjs
+      - scripts/release-*.mjs
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: desktop-release
+  cancel-in-progress: false
+jobs:
+  version:
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      publish: ${{ steps.check.outputs.publish }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "24"
+      - id: version
+        run: node scripts/release-version.cjs
+      - id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          if gh release view "$RELEASE_TAG" --json isDraft --jq '.isDraft' > /tmp/release-state 2>/dev/null; then
+            if [ "$(cat /tmp/release-state)" = false ]; then
+              echo 'publish=false' >> "$GITHUB_OUTPUT"
+              echo 'This version is already published; bump release.yaml for a new release.'
+              exit 0
+            fi
+          fi
+          echo 'publish=true' >> "$GITHUB_OUTPUT"
+  build:
+    needs: version
+    if: needs.version.outputs.publish == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            platform: linux
+            arch: x64
+          - os: windows-2025
+            platform: win
+            arch: x64
+          - os: macos-15-intel
+            platform: mac
+            arch: x64
+          - os: macos-15
+            platform: mac
+            arch: arm64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    defaults:
+      run:
+        shell: bash
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "24"
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - name: Package installers
+        run: npx electron-builder --config electron-builder.release.cjs --${{ matrix.platform }} --${{ matrix.arch }} --publish never
+      - name: Linux UI dependencies
+        if: runner.os == 'Linux'
+        run: npx playwright install-deps chromium
+      - name: Test packaged desktop app (Linux)
+        if: runner.os == 'Linux'
+        run: xvfb-run --auto-servernum node scripts/release-smoke.mjs
+      - name: Test packaged desktop app (macOS / Windows)
+        if: runner.os != 'Linux'
+        run: node scripts/release-smoke.mjs
+      - name: Upload installers
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: installers-${{ matrix.platform }}-${{ matrix.arch }}
+          path: |
+            release/*.dmg
+            release/*.zip
+            release/*.exe
+            release/*.AppImage
+            release/*.deb
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload UI test evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: screenshots-${{ matrix.platform }}-${{ matrix.arch }}
+          path: output/playwright/*.png
+          if-no-files-found: ignore
+  publish:
+    needs: [version, build]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          pattern: installers-*
+          merge-multiple: true
+          path: installers
+      - name: Publish all verified installers together
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.version.outputs.tag }}
+          RELEASE_VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          cd installers
+          sha256sum * > SHA256SUMS.txt
+          cd ..
+          cat > /tmp/release-notes.md <<'NOTES'
+          Desktop photo editor with local MCP automation.
+
+          Downloads: Windows x64 installer; macOS Intel and Apple Silicon DMG/ZIP; Linux x64 AppImage and Debian package. SHA256SUMS.txt contains download checksums.
+
+          This early release is unsigned and macOS builds are not notarized. Standard raster photos are supported; camera RAW development is not included.
+          NOTES
+          if ! gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release create "$RELEASE_TAG" --target "$GITHUB_SHA" --title "Lumaflux $RELEASE_VERSION" --notes-file /tmp/release-notes.md --draft
+          fi
+          gh release upload "$RELEASE_TAG" installers/* --clobber
+          gh release edit "$RELEASE_TAG" --draft=false --latest

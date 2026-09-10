@@ -1,0 +1,2 @@
+# Bump this four-part version on main to build and publish a desktop release.
+version: "0.10.0.1"
