@@ -133,7 +133,7 @@ jobs:
 
           Downloads: Windows x64 installer; macOS Intel and Apple Silicon DMG/ZIP; Linux x64 AppImage and Debian package. SHA256SUMS.txt contains download checksums.
 
-          This early release is unsigned and macOS builds are not notarized. Standard raster photos are supported; camera RAW development is not included.
+          This early release is unsigned and macOS builds are not notarized. Supports standard raster photos and camera RAW import, editing, and export through the existing 8-bit pipeline. MCP agent access starts automatically while Lumaflux is running; allowed folders still control imports and exports.
           NOTES
           if ! gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
             gh release create "$RELEASE_TAG" --target "$GITHUB_SHA" --title "Lumaflux $RELEASE_VERSION" --notes-file /tmp/release-notes.md --draft
