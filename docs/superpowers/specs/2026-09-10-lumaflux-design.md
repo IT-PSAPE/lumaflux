@@ -1,12 +1,12 @@
 # Lumaflux: lightweight desktop photo editor
 
-Status: proposed design for review. Implementation has not started.
+Status: implementation authorized by the user. Standard raster formats selected under delegated judgment. UI refined to high-density sizing and pink accent per subsequent user direction.
 
 ## Outcome
 
 An offline Electron desktop application for importing, browsing, selecting, editing, and exporting photos. React supplies the interface, Base UI supplies accessible controls, and Tailwind supplies styling. Local agents can perform the same operations through MCP, with changes reflected in the open application.
 
-The initial format baseline is JPEG, PNG, WebP, and TIFF. Camera RAW development is a pending scope decision, not an implied capability. No accounts or hosted services are required.
+The initial format baseline is JPEG, PNG, WebP, and TIFF. Camera RAW development is outside the first release. No accounts or hosted services are required.
 
 ## Interface and workflows
 
@@ -93,4 +93,4 @@ Use strict schemas, bounded pagination and batch sizes, explicit photo IDs, expe
 
 ## Deliberate exclusions
 
-Layers, brushes/masks, healing, AI generation, face recognition, cloud sync, tethering, printing, and Lightroom catalog compatibility are outside this first foundation. RAW support awaits the format decision. Large-library virtualization and a database migration should be driven by measured limits after the core workflow is verified.
+Layers, brushes/masks, healing, AI generation, face recognition, cloud sync, tethering, printing, and Lightroom catalog compatibility are outside this first foundation. RAW support is outside the first release. Large-library virtualization and a database migration should be driven by measured limits after the core workflow is verified.
