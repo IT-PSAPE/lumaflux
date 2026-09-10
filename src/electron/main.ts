@@ -86,7 +86,7 @@ if (!app.requestSingleInstanceLock()) {
         pool.render(p, r, o),
       );
       commands = activeCommands;
-      const configure = (enabled: boolean, roots: string[]) => {
+      const configure = (roots: string[]) => {
         const update = settingsTail.then(async () => {
           if (quitting) throw new Error("Lumaflux is shutting down");
           const canonical = await Promise.all(
@@ -97,25 +97,29 @@ if (!app.requestSingleInstanceLock()) {
               return p;
             }),
           );
-          if (mcp) {
-            await mcp.close();
-            mcp = undefined;
-          }
-          await unlink(configPath).catch(() => {});
-          settings = { enabled: false, roots: canonical };
-          if (enabled) {
-            if (!canonical.length)
-              throw new Error("Add an allowed folder before enabling agents");
-            mcp = await startMcp(activeCommands, { token, roots: canonical });
+          // Start the replacement before closing the current endpoint so a failed
+          // folder update cannot leave agent access disabled.
+          const nextMcp = await startMcp(activeCommands, {
+            token,
+            roots: canonical,
+          });
+          const connectionTemp = `${configPath}.tmp`;
+          try {
             await writeFile(
-              configPath,
-              JSON.stringify({ url: mcp.url, token }),
-              {
-                mode: 0o600,
-              },
+              connectionTemp,
+              JSON.stringify({ url: nextMcp.url, token }),
+              { mode: 0o600 },
             );
-            settings.enabled = true;
+            await rename(connectionTemp, configPath);
+          } catch (error) {
+            await nextMcp.close();
+            await unlink(connectionTemp).catch(() => {});
+            throw error;
           }
+          const previous = mcp;
+          mcp = nextMcp;
+          settings = { enabled: true, roots: canonical };
+          await previous?.close();
           const tmp = `${settingsPath}.tmp`;
           await writeFile(tmp, JSON.stringify(settings), { mode: 0o600 });
           await rename(tmp, settingsPath);
@@ -124,11 +128,21 @@ if (!app.requestSingleInstanceLock()) {
         settingsTail = update.catch(() => {});
         return update;
       };
+      let restoredRoots: string[] = [];
       try {
         const saved = z
-          .object({ enabled: z.boolean(), roots: z.array(z.string()) })
+          .object({ roots: z.array(z.string()).max(50) })
           .parse(JSON.parse(await readFile(settingsPath, "utf8")));
-        await configure(saved.enabled, saved.roots);
+        // A removed/unmounted folder must not prevent the MCP server starting.
+        for (const root of saved.roots) {
+          try {
+            const canonical = await realpath(root);
+            if ((await stat(canonical)).isDirectory())
+              restoredRoots.push(canonical);
+          } catch {
+            /* Unavailable roots grant no access. */
+          }
+        }
       } catch (e) {
         if ((e as NodeJS.ErrnoException).code !== "ENOENT")
           console.error(
@@ -136,6 +150,7 @@ if (!app.requestSingleInstanceLock()) {
             (e as Error).message,
           );
       }
+      await configure(restoredRoots);
       const thumbs = new Map<string, Buffer>();
       const pending = new Map<string, Promise<Buffer>>();
       protocol.handle("lumaflux", async (req) => {
@@ -249,12 +264,11 @@ if (!app.requestSingleInstanceLock()) {
           ).filePaths[0] ?? null,
       );
       handle("agent-settings", agentState);
-      handle("update-agent-settings", (enabled, roots) =>
-        configure(
-          z.boolean().parse(enabled),
-          z.array(z.string()).max(50).parse(roots),
-        ),
-      );
+      handle("update-agent-settings", (enabled, roots) => {
+        // Retain the IPC signature for older clients; access is always enabled.
+        z.boolean().parse(enabled);
+        return configure(z.array(z.string()).max(50).parse(roots));
+      });
       const createWindow = async () => {
         window = new BrowserWindow({
           width: 1440,

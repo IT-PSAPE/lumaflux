@@ -54,6 +54,19 @@ try {
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await page.getByText("A little room for your photos.").waitFor();
+  const initialAgent = await page.evaluate(() => window.lumaflux.settings());
+  assert.equal(initialAgent.enabled, true);
+  assert.deepEqual(initialAgent.roots, []);
+  assert.ok(initialAgent.endpoint);
+  assert.equal(
+    (await fetch(initialAgent.endpoint, { method: "POST" })).status,
+    401,
+  );
+  const stillEnabled = await page.evaluate(() =>
+    window.lumaflux.updateSettings(false, []),
+  );
+  assert.equal(stillEnabled.enabled, true);
+  assert.ok(stillEnabled.endpoint);
   await page.screenshot({ path: "output/playwright/empty.png" });
   await app.evaluate(
     ({ dialog }, paths) => {
@@ -289,8 +302,7 @@ try {
     });
   }, temp);
   await page.getByRole("button", { name: "Add folder", exact: true }).click();
-  await page.getByRole("button", { name: "Enable", exact: true }).click();
-  await page.getByText("Agent access is on", { exact: true }).waitFor();
+  await page.getByText("Agent access is always on", { exact: true }).waitFor();
   const connection = JSON.parse(
     await readFile(path.join(temp, "data", "mcp-connection.json"), "utf8"),
   );
@@ -407,12 +419,29 @@ try {
 // Relaunch against the real persisted catalog, detect a moved original, then relink it through UI.
 const relocated = path.join(temp, "relocated.png");
 await rename(source, relocated);
+// Migrate the old disabled setting and tolerate an unavailable saved folder.
+await writeFile(
+  path.join(temp, "data", "settings.json"),
+  JSON.stringify({
+    enabled: false,
+    roots: [temp, path.join(temp, "missing-folder")],
+  }),
+);
 const reopened = await electron.launch(launchOptions);
 try {
   const page = await reopened.firstWindow();
   await page
     .getByRole("button", { name: "Select color-study.png", exact: true })
     .waitFor();
+  const restoredAgent = await page.evaluate(() => window.lumaflux.settings());
+  assert.equal(restoredAgent.enabled, true);
+  assert.ok(restoredAgent.endpoint);
+  assert.deepEqual(restoredAgent.roots, [temp]);
+  const emptyAgent = await page.evaluate(() =>
+    window.lumaflux.updateSettings(true, []),
+  );
+  assert.equal(emptyAgent.enabled, true);
+  assert.ok(emptyAgent.endpoint);
   const stored = await page.evaluate(() =>
     window.lumaflux.command("get_app_state"),
   );

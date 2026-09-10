@@ -168,11 +168,11 @@ export function AgentDialog({
         .catch((e) => setError(e.message));
     }
   }, [open]);
-  const save = async (enabled: boolean, roots: string[]) => {
+  const save = async (roots: string[]) => {
     setBusy(true);
     setError("");
     try {
-      setSettings(await api.updateSettings(enabled, roots));
+      setSettings(await api.updateSettings(true, roots));
     } catch (e) {
       setError((e as Error).message);
       setSettings(await api.settings());
@@ -190,26 +190,17 @@ export function AgentDialog({
         <>
           <div className="agent-switch">
             <div>
-              <strong>
-                {settings.enabled
-                  ? "Agent access is on"
-                  : "Agent access is off"}
-              </strong>
+              <strong>Agent access is always on</strong>
               <p className="muted small">
-                Only authenticated clients on this computer
+                Starts automatically with Lumaflux. Only authenticated clients
+                on this computer.
               </p>
             </div>
-            <Btn
-              className={settings.enabled ? "" : "primary"}
-              disabled={busy || (!settings.enabled && !settings.roots.length)}
-              onClick={() => save(!settings.enabled, settings.roots)}
-            >
-              {settings.enabled ? "Disable" : "Enable"}
-            </Btn>
           </div>
           <h3>Allowed folders</h3>
           <p className="muted small">
-            Agents can import from and export to these folders.
+            Agents can import from and export to these folders. With no allowed
+            folders, agents can still work with the imported library.
           </p>
           <div className="root-list">
             {settings.roots.map((root) => (
@@ -218,12 +209,7 @@ export function AgentDialog({
                 <Btn
                   aria-label={`Remove ${root}`}
                   disabled={busy}
-                  onClick={() =>
-                    save(
-                      settings.enabled && settings.roots.length > 1,
-                      settings.roots.filter((r) => r !== root),
-                    )
-                  }
+                  onClick={() => save(settings.roots.filter((r) => r !== root))}
                 >
                   <Trash2 size={14} />
                 </Btn>
@@ -235,7 +221,7 @@ export function AgentDialog({
             onClick={async () => {
               const p = await api.chooseDirectory();
               if (p && !settings.roots.includes(p))
-                await save(settings.enabled, [...settings.roots, p]);
+                await save([...settings.roots, p]);
             }}
           >
             <Plus size={14} />

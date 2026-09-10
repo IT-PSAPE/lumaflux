@@ -35,12 +35,12 @@ Keyboard: `G` library, `E` editor, arrow keys navigate, Command/Ctrl+A select vi
 ## Local agents / MCP
 
 1. Open **Agents** in the top bar.
-2. Add allowed import/export folders and enable access.
+2. Agent access is always enabled while Lumaflux is running. Add allowed import/export folders.
 3. Copy the client configuration into an MCP-compatible agent. Keep Lumaflux running.
 
 The copied configuration uses `node` and a bundled stdio adapter. The packaged adapter is outside `app.asar` and can run independently of the development checkout. The adapter reads an owner-only connection file containing the loopback endpoint and a per-launch token. Credentials are not included in the copied JSON.
 
-The app hosts authenticated Streamable HTTP on a dynamic `127.0.0.1` port. Direct HTTP clients may use the same connection file and a `Bearer` authorization header. Browser origins are rejected. Disabling access closes the endpoint and removes the connection file. Idle HTTP sessions expire after 30 minutes; clients can initialize a new session. MCP does not launch a second catalog writer.
+The app hosts authenticated Streamable HTTP on a dynamic `127.0.0.1` port. Direct HTTP clients may use the same connection file and a `Bearer` authorization header. Browser origins are rejected. The endpoint starts automatically on every launch, including first launch and previously disabled settings. Quitting Lumaflux closes it and removes the connection file. Idle HTTP sessions expire after 30 minutes; clients can initialize a new session. MCP does not launch a second catalog writer.
 
 Tools:
 
@@ -66,7 +66,7 @@ Edits require an explicit photo ID and `expectedRevision`. Read the photo first,
 
 If another agent or the UI changes the photo, the request returns `CONFLICT`; read again before retrying. Batch edits are atomic. Import and export results may partially succeed. Each export snapshots its recipes when queued. No tool deletes or overwrites an original.
 
-The enabled agent can inspect and edit the imported library. Allowed folders constrain new filesystem imports and export destinations; they are not per-photo read permissions. Don't enable an agent you do not trust with your photo catalog.
+The enabled agent can inspect and edit the imported library. Allowed folders constrain new filesystem imports and export destinations; they are not per-photo read permissions. Only connect agents you trust with your photo catalog. With no allowed folders, agents can inspect and edit imported photos, but new filesystem imports and exports are denied.
 
 ## Storage and image processing
 
