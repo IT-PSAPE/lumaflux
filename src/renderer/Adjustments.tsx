@@ -1,3 +1,5 @@
+import { Histogram } from "./Histogram";
+import type { HistogramData, PixelReadout } from "./histogram-data";
 import { useRef } from "react";
 import { Slider } from "@base-ui/react/slider";
 import {
@@ -12,6 +14,11 @@ import {
 import { adjustmentControls, type Photo, type Recipe } from "../shared/model";
 import { Btn } from "./ui";
 export function Adjustments({
+  histogramData,
+  pixelSample,
+  clipping,
+  onClipping,
+  onClipHover,
   photo,
   recipe,
   onDraft,
@@ -26,6 +33,11 @@ export function Adjustments({
   locked,
   onLocked,
 }: {
+  histogramData: HistogramData | null;
+  pixelSample: PixelReadout;
+  clipping: { shadows: boolean; highlights: boolean };
+  onClipping: (kind: "shadows" | "highlights") => void;
+  onClipHover: (kind: "shadows" | "highlights" | null) => void;
   tab: string;
   onTab: (tab: string) => void;
   aspect: string;
@@ -56,6 +68,18 @@ export function Adjustments({
   }
   return (
     <aside className="adjustments panel">
+      <Histogram
+        data={histogramData}
+        sample={pixelSample}
+        photo={photo}
+        recipe={recipe}
+        busy={busy}
+        onDraft={onDraft}
+        onCommit={onCommit}
+        clipping={clipping}
+        onClipping={onClipping}
+        onHover={onClipHover}
+      />
       <div className="inspector-tabs" role="tablist" aria-label="Photo tools">
         {["Adjustments", "Composition", "Info"].map((name) => (
           <button

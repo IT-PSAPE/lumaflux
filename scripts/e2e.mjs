@@ -147,6 +147,80 @@ try {
     1,
   );
   assert.equal(await page.locator(".viewer-file").count(), 0);
+  await page.locator('.histogram-plot path[data-channel="red"]').waitFor();
+  const histBox = await page.locator(".histogram-panel").boundingBox();
+  const tabsBox = await page.locator(".inspector-tabs").boundingBox();
+  assert.ok(histBox.y + histBox.height <= tabsBox.y + 1);
+  const graphBefore = await page
+    .locator('.histogram-plot path[data-channel="red"]')
+    .getAttribute("d");
+  await page
+    .getByRole("slider", { name: "Histogram Exposure", exact: true })
+    .focus();
+  await page.keyboard.press("ArrowRight");
+  await page.waitForFunction(
+    (before) =>
+      document
+        .querySelector('.histogram-plot path[data-channel="red"]')
+        ?.getAttribute("d") !== before,
+    graphBefore,
+  );
+  const histSlider = await page
+    .getByRole("slider", { name: "Histogram Exposure", exact: true })
+    .boundingBox();
+  await poll(() =>
+    page
+      .getByRole("slider", { name: "Histogram Exposure", exact: true })
+      .isEnabled(),
+  );
+  await page.mouse.move(
+    histSlider.x + histSlider.width / 2,
+    histSlider.y + histSlider.height / 2,
+  );
+  await page.mouse.down();
+  await page.mouse.move(
+    histSlider.x + histSlider.width / 2 + 8,
+    histSlider.y + histSlider.height / 2,
+    { steps: 4 },
+  );
+  await page.mouse.up();
+  await page
+    .getByRole("button", { name: "Highlight clipping", exact: true })
+    .click();
+  assert.equal(
+    await page
+      .getByRole("button", { name: "Highlight clipping", exact: true })
+      .getAttribute("aria-pressed"),
+    "true",
+  );
+  await page
+    .getByRole("button", { name: "Highlight clipping", exact: true })
+    .click();
+  await page.keyboard.press("j");
+  assert.equal(
+    await page
+      .getByRole("button", { name: "Shadow clipping", exact: true })
+      .getAttribute("aria-pressed"),
+    "true",
+  );
+  await page.waitForFunction(() => {
+    const canvas = document.querySelector(".clipping-overlay");
+    return (
+      canvas &&
+      canvas
+        .getContext("2d")
+        .getImageData(0, 0, canvas.width, canvas.height)
+        .data.some((v, i) => i % 4 === 3 && v > 0)
+    );
+  });
+  await page.keyboard.press("j");
+  const imageBox = await page.locator(".image-wrap img").boundingBox();
+  await page.mouse.move(
+    imageBox.x + imageBox.width / 2,
+    imageBox.y + imageBox.height / 2,
+  );
+  await page.locator(".rgb-readout").waitFor();
+  await page.screenshot({ path: "output/playwright/histogram.png" });
   const right = await page.locator(".inspector-shell").boundingBox();
   await page.getByRole("separator", { name: "Resize right panel" }).focus();
   await page.keyboard.press("ArrowLeft");

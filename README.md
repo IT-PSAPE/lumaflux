@@ -106,3 +106,5 @@ Download desktop installers from [GitHub Releases](https://github.com/IT-PSAPE/l
 RAW decoding uses [LibRaw-Wasm](https://github.com/ybouane/LibRaw-Wasm) 1.6.0, bundled locally (no external converter installation or network required). Its WebAssembly engine runs in disposable workers; developed sources are cached within a 128 MB limit per rendering context and invalidated when originals change.
 
 Lens correction is available under **Composition → Lens correction** (manual distortion, corner illumination, and red/blue fringe alignment). **Adjustments → Details** contains separate luminance and color noise reduction. Both work with RAW/raster photos, exports, undo, and MCP edits. See [lens correction and denoising](docs/lens-and-denoising.md) for ranges, behavior, and limitations.
+
+The inspector's RGB histogram supports tonal-region dragging, clipping previews (hover or click the corner indicators; **J** toggles both), and RGB readings when hovering over the edited photo. It updates from the rendered preview and follows the current crop. See [histogram behavior](docs/histogram.md).

@@ -21,6 +21,7 @@ import {
 import type { AppState, DesktopAPI, Photo, Recipe } from "../shared/model";
 import { adjustmentControls } from "../shared/model";
 import { Btn } from "./ui";
+import type { HistogramData, PixelReadout } from "./histogram-data";
 import { Adjustments } from "./Adjustments";
 import { PanelResize } from "./PanelResize";
 import { FolderBrowser } from "./FolderBrowser";
@@ -37,6 +38,29 @@ export function App() {
   const [state, setState] = useState<AppState>(empty);
   const [activeId, setActiveId] = useState<string>();
   const [view, setView] = useState<"gallery" | "editor">("gallery");
+  const [histogramFrame, setHistogramFrame] = useState<{
+    id: string;
+    data: HistogramData | null;
+  } | null>(null);
+  const [pixelSample, setPixelSample] = useState<PixelReadout>(null);
+  const [clipping, setClipping] = useState({
+    shadows: false,
+    highlights: false,
+  });
+  const [clipHover, setClipHover] = useState<"shadows" | "highlights" | null>(
+    null,
+  );
+  const receiveHistogram = useCallback(
+    (id: string, data: HistogramData | null) => setHistogramFrame({ id, data }),
+    [],
+  );
+  const receiveSample = useCallback(
+    (value: PixelReadout) =>
+      setPixelSample((previous) =>
+        JSON.stringify(previous) === JSON.stringify(value) ? previous : value,
+      ),
+    [],
+  );
   const [tab, setTab] = useState("Adjustments");
   const [aspect, setAspect] = useState("free");
   const [locked, setLocked] = useState(false);
@@ -257,6 +281,11 @@ export function App() {
         if (!busy) void safe(() => action(event.shiftKey ? "redo" : "undo"));
       } else if (event.key === "ArrowRight") navigate(1);
       else if (event.key === "ArrowLeft") navigate(-1);
+      else if (event.key.toLowerCase() === "j" && view === "editor")
+        setClipping((previous) => ({
+          shadows: !(previous.shadows && previous.highlights),
+          highlights: !(previous.shadows && previous.highlights),
+        }));
       else if (event.key.toLowerCase() === "g") setView("gallery");
       else if (event.key.toLowerCase() === "e" && photo) {
         setView("editor");
@@ -539,6 +568,13 @@ export function App() {
                 <>
                   <Viewer
                     photo={photo}
+                    onHistogram={receiveHistogram}
+                    onSample={receiveSample}
+                    clipping={{
+                      shadows: clipping.shadows || clipHover === "shadows",
+                      highlights:
+                        clipping.highlights || clipHover === "highlights",
+                    }}
                     busy={busy}
                     onAction={(name) => void safe(() => action(name))}
                     composition={tab === "Composition"}
@@ -746,6 +782,20 @@ export function App() {
             />
             <div className="inspector-shell" style={{ width: rightWidth }}>
               <Adjustments
+                histogramData={
+                  histogramFrame?.id === photo?.id
+                    ? (histogramFrame?.data ?? null)
+                    : null
+                }
+                pixelSample={pixelSample}
+                clipping={clipping}
+                onClipHover={setClipHover}
+                onClipping={(kind) =>
+                  setClipping((previous) => ({
+                    ...previous,
+                    [kind]: !previous[kind],
+                  }))
+                }
                 tab={tab}
                 onTab={setTab}
                 aspect={aspect}

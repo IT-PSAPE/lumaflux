@@ -14,8 +14,18 @@ import type { Photo, Recipe } from "../shared/model";
 import { neutralRecipe } from "../shared/model";
 import { LatestPreview } from "../core/preview";
 import { Btn } from "./ui";
+import {
+  histogram,
+  clippingPixels,
+  samplePixel,
+  type HistogramData,
+  type PixelReadout,
+} from "./histogram-data";
 import { fullCrop, resizeCrop, type CropBox } from "./crop";
 export function Viewer({
+  onHistogram,
+  onSample,
+  clipping,
   photo,
   recipe,
   preview,
@@ -31,6 +41,9 @@ export function Viewer({
   busy,
   onAction,
 }: {
+  onHistogram: (id: string, data: HistogramData | null) => void;
+  onSample: (value: PixelReadout) => void;
+  clipping: { shadows: boolean; highlights: boolean };
   busy: boolean;
   onAction: (name: string) => void;
   photo: Photo;
@@ -54,6 +67,23 @@ export function Viewer({
     [pan, setPan] = useState({ x: 0, y: 0 }),
     [full, setFull] = useState(false);
   const [crop, setCrop] = useState<CropBox>(recipe.crop ?? fullCrop);
+  const rasterPhoto = useRef("");
+  const [raster, setRaster] = useState<ImageData | null>(null);
+  const overlay = useRef<HTMLCanvasElement>(null);
+  function analyzeImage(element: HTMLImageElement) {
+    const canvas = document.createElement("canvas");
+    const factor = Math.min(
+      1,
+      1024 / Math.max(element.naturalWidth, element.naturalHeight),
+    );
+    canvas.width = Math.max(1, Math.round(element.naturalWidth * factor));
+    canvas.height = Math.max(1, Math.round(element.naturalHeight * factor));
+    const context = canvas.getContext("2d", { willReadFrequently: true });
+    if (!context) return;
+    context.drawImage(element, 0, 0, canvas.width, canvas.height);
+    rasterPhoto.current = photo.id;
+    setRaster(context.getImageData(0, 0, canvas.width, canvas.height));
+  }
   const img = useRef<HTMLImageElement>(null),
     serial = useRef(0),
     pixelFit = useRef(false);
@@ -178,6 +208,52 @@ export function Viewer({
   useEffect(() => {
     setSrc("");
   }, [photo.id, photo.path]);
+  useEffect(() => {
+    rasterPhoto.current = "";
+    setRaster(null);
+    onHistogram(photo.id, null);
+    onSample(null);
+  }, [photo.id, photo.path]);
+  useEffect(() => {
+    if (raster && rasterPhoto.current === photo.id)
+      onHistogram(
+        photo.id,
+        histogram(
+          raster.data,
+          raster.width,
+          composition && !compare ? crop : undefined,
+        ),
+      );
+  }, [raster, JSON.stringify(crop), composition, compare, photo.id]);
+  useEffect(() => {
+    const canvas = overlay.current,
+      element = img.current;
+    if (!canvas || !element || !raster) return;
+    canvas.width = raster.width;
+    canvas.height = raster.height;
+    const ctx = canvas.getContext("2d");
+    if (ctx)
+      ctx.putImageData(
+        new ImageData(
+          clippingPixels(raster.data, clipping.shadows, clipping.highlights),
+          raster.width,
+          raster.height,
+        ),
+        0,
+        0,
+      );
+    const position = () => {
+      canvas.style.left = `${element.offsetLeft}px`;
+      canvas.style.top = `${element.offsetTop}px`;
+      canvas.style.width = `${element.offsetWidth}px`;
+      canvas.style.height = `${element.offsetHeight}px`;
+    };
+    position();
+    const observer = new ResizeObserver(position);
+    observer.observe(element);
+    if (element.parentElement) observer.observe(element.parentElement);
+    return () => observer.disconnect();
+  }, [raster, clipping.shadows, clipping.highlights, compare]);
   function down(e: PointerEvent<HTMLDivElement>) {
     if (e.button !== 0 || !img.current) return;
     const handle = (e.target as HTMLElement).closest<HTMLElement>(
@@ -198,6 +274,18 @@ export function Viewer({
     e.preventDefault();
   }
   function move(e: PointerEvent<HTMLDivElement>) {
+    if (img.current && raster) {
+      const bounds = img.current.getBoundingClientRect();
+      onSample(
+        samplePixel(
+          raster.data,
+          raster.width,
+          raster.height,
+          (e.clientX - bounds.left) / bounds.width,
+          (e.clientY - bounds.top) / bounds.height,
+        ),
+      );
+    }
     const d = drag.current;
     if (!d) return;
     if (d.handle === "pan")
@@ -310,6 +398,7 @@ export function Viewer({
         className={`canvas ${composition && !compare ? "cropping" : ""} ${compare ? "comparing" : ""}`}
         onPointerDown={down}
         onPointerMove={move}
+        onPointerLeave={() => onSample(null)}
         onPointerUp={() => {
           if (
             drag.current &&
@@ -358,6 +447,7 @@ export function Viewer({
               alt={compare ? `Edited ${photo.name}` : photo.name}
               draggable={false}
               onLoad={(e) => {
+                analyzeImage(e.currentTarget);
                 if (pixelFit.current) {
                   setZoom(
                     e.currentTarget.naturalWidth /
@@ -367,6 +457,12 @@ export function Viewer({
                   pixelFit.current = false;
                 }
               }}
+            />
+            <canvas
+              ref={overlay}
+              className="clipping-overlay"
+              aria-hidden="true"
+              data-active={clipping.shadows || clipping.highlights}
             />
             {composition && !compare && (
               <div

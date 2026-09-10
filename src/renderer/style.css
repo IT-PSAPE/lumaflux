@@ -1323,3 +1323,100 @@ fieldset {
   margin-right: 4px;
   border-right: 1px solid var(--border);
 }
+.histogram-panel {
+  flex: none;
+  padding: 6px 10px 3px;
+  border-bottom: 1px solid var(--border);
+}
+.histogram-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 20px;
+  font-size: 10px;
+  color: #a8aaad;
+}
+.clipping-toggle {
+  background: transparent;
+  border: 1px solid transparent;
+  width: 19px;
+  height: 17px;
+  padding: 0;
+  font-size: 10px;
+  line-height: 14px;
+  cursor: pointer;
+}
+.clipping-toggle[aria-pressed="true"] {
+  border-color: #ccc;
+}
+.clipping-toggle:focus-visible {
+  outline: 1px solid #f18bb9;
+}
+.histogram-plot {
+  position: relative;
+  height: 80px;
+  background: #171819;
+  overflow: hidden;
+  isolation: isolate;
+}
+.histogram-plot svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.histogram-zone {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 20%;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: ew-resize;
+  touch-action: none;
+}
+.histogram-zone.hovered,
+.histogram-zone:focus-visible {
+  background: #ffffff12;
+  outline: 1px solid #ffffff30;
+  outline-offset: -1px;
+}
+.histogram-zone:disabled {
+  cursor: default;
+}
+.histogram-empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #777;
+  font-size: 10px;
+  pointer-events: none;
+}
+.histogram-readout {
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 10px;
+  color: #a8aaad;
+  font-variant-numeric: tabular-nums;
+}
+.rgb-readout {
+  display: flex;
+  gap: 9px;
+}
+.clipping-overlay {
+  position: absolute;
+  pointer-events: none;
+  z-index: 1;
+}
+.clipping-overlay[data-active="false"] {
+  visibility: hidden;
+}
+.compare-pane {
+  position: relative;
+}
+.crop-rectangle {
+  z-index: 2;
+}

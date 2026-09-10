@@ -81,3 +81,9 @@ Pulled upstream main through `2fc6fa4` before implementation, retaining its RAW 
 All 54 tests pass, including noise/error reduction and edge-preservation fixtures, legacy defaults, alpha safety, original preservation, correction cache invalidation, small-image preview/export agreement, history persistence, and MCP access. The Electron workflow exercises the new controls with the existing crop, comparison, zoom, agent, export, and relink flows. Screenshots include `lens-correction.png` and `denoising.png`.
 
 The rebuilt Apple Silicon desktop app also passed `node scripts/release-smoke.mjs`, including noise-copy/lens-exclusion checks and relaunch/relink. No new public release was created for this local feature addition.
+
+## Interactive RGB histogram
+
+Added a compact histogram above the inspector tabs with overlapping RGB distributions, draggable tone regions, channel clipping indicators and overlays, J toggling, and hovered-pixel RGB percentages. Statistics reuse the displayed preview and follow composition crops without an additional backend render. See `docs/histogram.md` for sampling and color-space details.
+
+All 57 tests and TypeScript checks pass. The rebuilt Apple Silicon app passed `node scripts/release-smoke.mjs`, including histogram placement, exposure-driven graph updates, drag input, clipping toggle/overlay pixels, RGB readout, and the existing edit/export/MCP/relaunch workflow. Visually checked `output/playwright/histogram.png`. No public release was created.
