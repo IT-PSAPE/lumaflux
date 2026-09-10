@@ -1316,3 +1316,10 @@ fieldset {
   margin: 0;
   accent-color: #f18bb9;
 }
+.toolbar-group {
+  display: flex;
+  gap: 4px;
+  padding-right: 8px;
+  margin-right: 4px;
+  border-right: 1px solid var(--border);
+}

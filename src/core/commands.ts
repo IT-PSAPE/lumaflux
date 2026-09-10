@@ -136,6 +136,7 @@ export class Commands {
         maxDimension: z.number().int().min(64).max(20000).parse(maxDimension),
         format: "jpeg",
         quality: 88,
+        preview: maxDimension < 20000,
       },
     );
   }

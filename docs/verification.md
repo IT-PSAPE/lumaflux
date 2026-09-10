@@ -51,3 +51,15 @@ The updated workspace has separate Adjustments, Composition, and Info tabs, a si
 42 unit/integration tests pass, including opaque rotation bounds for portrait/landscape images at positive/negative angles through 45 degrees, quarter turns, and all eight locked crop handles at extreme drags. The Electron workflow additionally checks hidden panels, real folder traversal, keyboard panel resizing, isolated Info content, automatic crop handles, distinct comparison images, 1:1 viewing, MCP synchronization, batch export, persistence, and relinking.
 
 The complete revised workflow also passed against the rebuilt `release/mac-arm64/Lumaflux.app`, including the straighten slider and relaunch/relink checks. Screenshots include `composition.png`, `compare.png`, and the minimum-size `compact.png`.
+
+## Sidebar restoration and preview latency
+
+Restored the persistent Library sidebar; Edit still hides it. Removed the duplicate library bottom strip and local-save wording. Undo/redo/reset now occupy the viewer toolbar, and filename/dimensions are available in Info.
+
+The original synthetic 6000×4000 JPEG benchmark (seven changing exposure renders, 5° straighten, 1600px output) measured a warm median of 1121 ms. With bounded source/geometry caches and channel lookup tables, the same scenario measured 58 ms (about 19× faster); first render was 435 ms. These are local renderer timings, not an end-to-end latency guarantee or a benchmark of complex real photos. The reproducible benchmark is `scripts/benchmark-preview.ts --preview` via tsx.
+
+The canvas no longer debounces until dragging pauses or rerenders crop-only changes in Composition. It shows completed frames while coalescing pending requests and rejects frames belonging to another photo/view. Canvas work takes priority over queued thumbnails. Per worker, decoded source caches are bounded to 64 MiB and geometry caches to 32 MiB; full-resolution view and export bypass preview downsampling.
+
+44 tests cover previous behavior plus cache byte limits, eviction, source replacement invalidation, and pixel isolation across cached edits. The Electron workflow confirms a changed canvas image while the slider pointer is still held, the restored sidebar, toolbar history controls, crop/compare, MCP edits, exports, and relaunch/relink.
+
+The same complete desktop workflow passed against the rebuilt packaged app after this performance revision, including live slider feedback before pointer release and source-byte preservation after export.

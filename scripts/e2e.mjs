@@ -76,8 +76,7 @@ try {
   );
   await page.getByRole("button", { name: "Dismiss notification" }).click();
   assert.equal(await page.locator(".adjustments").count(), 0);
-  assert.equal(await page.locator(".navigation").count(), 0);
-  await page.getByRole("button", { name: "Folders", exact: true }).click();
+  assert.equal(await page.locator(".navigation").count(), 1);
   await app.evaluate(({ dialog }, folder) => {
     dialog.showOpenDialog = async () => ({
       canceled: false,
@@ -100,7 +99,6 @@ try {
   assert.ok(
     (await page.locator(".navigation").boundingBox()).width > left.width,
   );
-  await page.getByRole("button", { name: "Folders", exact: true }).click();
   await page.screenshot({ path: "output/playwright/gallery.png" });
   await page
     .getByRole("button", { name: "Favorite color-study.png", exact: true })
@@ -112,6 +110,21 @@ try {
     .getByRole("button", { name: "Select color-study.png", exact: true })
     .dblclick();
   await page.locator(".image-wrap img").waitFor();
+  assert.equal(
+    await page
+      .locator(".adjustments")
+      .getByRole("button", { name: "Undo", exact: true })
+      .count(),
+    0,
+  );
+  assert.equal(
+    await page
+      .locator(".viewer-tools")
+      .getByRole("button", { name: "Undo", exact: true })
+      .count(),
+    1,
+  );
+  assert.equal(await page.locator(".viewer-file").count(), 0);
   const right = await page.locator(".inspector-shell").boundingBox();
   await page.getByRole("separator", { name: "Resize right panel" }).focus();
   await page.keyboard.press("ArrowLeft");
@@ -135,6 +148,31 @@ try {
       );
     }),
   );
+  await page.waitForFunction(() => !document.querySelector(".canvas-status"));
+  const previousPreview = await page
+    .locator(".image-wrap img")
+    .getAttribute("src");
+  const track = await page
+    .locator(".adjustment")
+    .first()
+    .locator(".slider-track")
+    .boundingBox();
+  await page.mouse.move(
+    track.x + track.width * 0.51,
+    track.y + track.height / 2,
+  );
+  await page.mouse.down();
+  await page.mouse.move(
+    track.x + track.width * 0.6,
+    track.y + track.height / 2,
+    { steps: 12 },
+  );
+  await page.waitForFunction(
+    (previous) => document.querySelector(".image-wrap img")?.src !== previous,
+    previousPreview,
+  );
+  await page.mouse.up();
+  await page.waitForFunction(() => !document.querySelector(".canvas-status"));
   let state = await page.evaluate(() =>
     window.lumaflux.command("get_app_state"),
   );

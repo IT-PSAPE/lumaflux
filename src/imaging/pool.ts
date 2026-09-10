@@ -90,7 +90,21 @@ export class RenderPool {
         new Error("Render queue is full; try again shortly"),
       );
     return new Promise((resolve, reject) => {
-      this.queue.push({ filePath, recipe, options, resolve, reject });
+      const job = { filePath, recipe, options, resolve, reject };
+      // Canvas updates must not wait behind a gallery's queued thumbnails or exports.
+      const interactive =
+        options.preview !== undefined && (options.maxDimension ?? 1600) > 360;
+      if (interactive) {
+        const index = this.queue.findIndex(
+          (j) =>
+            !(
+              j.options.preview !== undefined &&
+              (j.options.maxDimension ?? 1600) > 360
+            ),
+        );
+        if (index < 0) this.queue.push(job);
+        else this.queue.splice(index, 0, job);
+      } else this.queue.push(job);
       this.drain();
     });
   }

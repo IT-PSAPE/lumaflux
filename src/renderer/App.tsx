@@ -40,7 +40,6 @@ export function App() {
   const [tab, setTab] = useState("Adjustments");
   const [aspect, setAspect] = useState("free");
   const [locked, setLocked] = useState(false);
-  const [foldersOpen, setFoldersOpen] = useState(false);
   const [leftWidth, setLeftWidth] = useState(() =>
     Math.max(
       180,
@@ -317,7 +316,7 @@ export function App() {
         </div>
       </header>
       <div className="workspace">
-        {view === "gallery" && foldersOpen && (
+        {view === "gallery" && (
           <>
             <aside className="navigation panel" style={{ width: leftWidth }}>
               <h2>Library</h2>
@@ -533,6 +532,8 @@ export function App() {
                 <>
                   <Viewer
                     photo={photo}
+                    busy={busy}
+                    onAction={(name) => void safe(() => action(name))}
                     composition={tab === "Composition"}
                     aspect={aspect}
                     locked={locked}
@@ -759,47 +760,12 @@ export function App() {
           </>
         )}
       </div>
-      {view === "gallery" && (
-        <div className="library-bottom">
-          <Btn
-            aria-pressed={foldersOpen}
-            onClick={() => setFoldersOpen(!foldersOpen)}
-          >
-            <FolderOpen size={14} />
-            Folders
-          </Btn>
-          <select
-            aria-label="Library collection"
-            value={section}
-            onChange={(e) => setSection(e.target.value)}
-          >
-            <option value="all">All photos</option>
-            <option value="favorites">Favorites</option>
-            <option value="jobs">Exports</option>
-            {folders.map((f) => (
-              <option key={f} value={f}>
-                {f.split("/").pop()}
-              </option>
-            ))}
-          </select>
-          <span className="spacer" />
-          <Btn
-            disabled={busy}
-            onClick={() =>
-              safe(async () => importPaths(await api.chooseImport()))
-            }
-          >
-            <Plus size={14} />
-            Import photos
-          </Btn>
-        </div>
-      )}
       <footer className="statusbar">
         <span>
           {busy
             ? "Working…"
             : ready
-              ? "Library saved locally"
+              ? "Ready"
               : "Opening library…"}
         </span>
         <span>

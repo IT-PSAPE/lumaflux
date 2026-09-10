@@ -132,6 +132,8 @@ export type AgentSettings = {
   clientConfig: string;
 };
 export type RenderOptions = {
+  /** Screen previews may use a bounded, downsampled source cache. Exports never do. */
+  preview?: boolean;
   maxDimension?: number;
   format?: "jpeg" | "png" | "webp";
   quality?: number;

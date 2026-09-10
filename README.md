@@ -95,4 +95,6 @@ LUMAFLUX_EXECUTABLE="$PWD/release/mac-arm64/Lumaflux.app/Contents/MacOS/Lumaflux
 
 Research and architectural decisions are in [docs/research/architecture-references.md](docs/research/architecture-references.md). Original implementation; no code was copied from the photo editor reference projects.
 
-Library mode keeps panels hidden by default. Use Folders at the bottom to explore local directories and import photos; drag the panel divider to resize it. Edit mode shows the resizable Adjustments / Composition / Info inspector. Copy and paste icons share one row with Apply to selected.
+Library mode shows its left sidebar with All photos, Favorites, Exports, imported folders, and local directory exploration. Import controls stay at its bottom; drag the panel divider to resize it. Edit mode shows the resizable Adjustments / Composition / Info inspector. Copy and paste icons share one row with Apply to selected.
+
+Preview rendering caches downsampled sources and geometry within per-worker byte limits, invalidates replaced source files, and prioritizes canvas updates over queued thumbnails. Crop-frame updates reuse the background. Exports and 1:1 viewing use the full source. Run `npx tsx scripts/benchmark-preview.ts --preview` for the synthetic 24-megapixel preview benchmark.

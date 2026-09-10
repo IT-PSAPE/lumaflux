@@ -6,9 +6,13 @@ import {
   Columns2,
   ChevronLeft,
   ChevronRight,
+  Undo2,
+  Redo2,
+  RefreshCcw,
 } from "lucide-react";
 import type { Photo, Recipe } from "../shared/model";
 import { neutralRecipe } from "../shared/model";
+import { LatestPreview } from "../core/preview";
 import { Btn } from "./ui";
 import { fullCrop, resizeCrop, type CropBox } from "./crop";
 export function Viewer({
@@ -24,7 +28,11 @@ export function Viewer({
   next,
   canPrevious,
   canNext,
+  busy,
+  onAction,
 }: {
+  busy: boolean;
+  onAction: (name: string) => void;
   photo: Photo;
   recipe: Recipe;
   preview: (id: string, recipe: Recipe, max?: number) => Promise<string>;
@@ -86,44 +94,90 @@ export function Viewer({
     setCrop(box);
     onCrop(box);
   }, [aspect, composition]);
+  const renderRecipe =
+    composition && !compare ? { ...recipe, crop: null } : recipe;
+  const recipeKey = JSON.stringify(renderRecipe);
+  const context = JSON.stringify([
+    photo.id,
+    photo.path,
+    composition,
+    compare,
+    full,
+  ]);
+  const activeContext = useRef(context);
+  activeContext.current = context;
+  const originalCache = useRef<{ key: string; src: string } | undefined>(
+    undefined,
+  );
+  type Request = {
+    id: string;
+    source: string;
+    recipe: Recipe;
+    compare: boolean;
+    full: boolean;
+  };
+  const queue = useRef<LatestPreview<
+    Request,
+    { before: string; after: string }
+  > | null>(null);
+  if (!queue.current)
+    queue.current = new LatestPreview(async (request) => {
+      let before = "";
+      if (request.compare) {
+        if (originalCache.current?.key === request.source)
+          before = originalCache.current.src;
+        else {
+          before = await preview(request.id, neutralRecipe(), 1600);
+          originalCache.current = { key: request.source, src: before };
+        }
+      }
+      const after = await preview(
+        request.id,
+        request.recipe,
+        request.full ? 20000 : 1600,
+      );
+      return { before, after };
+    });
   useEffect(() => {
-    let alive = true;
     const id = ++serial.current;
     setLoading(true);
-    const timer = setTimeout(async () => {
-      try {
-        // Sequential requests respect the shared renderer's latest-preview queue.
-        const before = compare
-          ? await preview(photo.id, neutralRecipe(), 2000)
-          : "";
-        if (!alive) return;
-        const after = await preview(
-          photo.id,
-          composition && !compare ? { ...recipe, crop: null } : recipe,
-          full ? 20000 : 2000,
-        );
-        if (alive && serial.current === id) {
+    void queue
+      .current!.request({
+        id: photo.id,
+        source: `${photo.id}:${photo.path}:${photo.size}`,
+        recipe: renderRecipe,
+        compare,
+        full,
+      })
+      .then(({ before, after }) => {
+        // Show completed frames while dragging; coalesce waiting work, not visible feedback.
+        // A different photo or viewing mode must never receive a stale frame.
+        if (activeContext.current === context) {
           setOriginal(before);
           setSrc(after);
         }
-      } catch (e) {
-        if (alive && !String(e).includes("SUPERSEDED")) onError(String(e));
-      } finally {
-        if (alive) setLoading(false);
-      }
-    }, 75);
-    return () => {
-      alive = false;
-      clearTimeout(timer);
-    };
-  }, [
-    photo.id,
-    photo.revision,
-    JSON.stringify(recipe),
-    compare,
-    composition,
-    full,
-  ]);
+      })
+      .catch((e) => {
+        if (
+          activeContext.current === context &&
+          !String(e).includes("SUPERSEDED")
+        )
+          onError(String(e));
+      })
+      .finally(() => {
+        if (serial.current === id) setLoading(false);
+      });
+  }, [context, recipeKey]);
+  useEffect(
+    () => () => {
+      activeContext.current = "";
+      serial.current++;
+    },
+    [],
+  );
+  useEffect(() => {
+    setSrc("");
+  }, [photo.id, photo.path]);
   function down(e: PointerEvent<HTMLDivElement>) {
     if (e.button !== 0 || !img.current) return;
     const handle = (e.target as HTMLElement).closest<HTMLElement>(
@@ -168,11 +222,31 @@ export function Viewer({
   return (
     <div className="viewer">
       <div className="viewer-tools">
-        <div className="viewer-file">
-          <strong>{photo.name}</strong>
-          <span className="muted">
-            {photo.width} × {photo.height}
-          </span>
+        <div className="toolbar-group" aria-label="Edit history">
+          <Btn
+            title="Undo (⌘Z)"
+            aria-label="Undo"
+            disabled={!photo.history.length || busy}
+            onClick={() => onAction("undo")}
+          >
+            <Undo2 size={14} />
+          </Btn>
+          <Btn
+            title="Redo (⇧⌘Z)"
+            aria-label="Redo"
+            disabled={!photo.future.length || busy}
+            onClick={() => onAction("redo")}
+          >
+            <Redo2 size={14} />
+          </Btn>
+          <Btn
+            title="Reset edits"
+            aria-label="Reset edits"
+            disabled={busy}
+            onClick={() => onAction("reset_edits")}
+          >
+            <RefreshCcw size={14} />
+          </Btn>
         </div>
         <Btn
           aria-label="Previous photo"

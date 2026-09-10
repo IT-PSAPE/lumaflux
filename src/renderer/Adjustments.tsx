@@ -5,11 +5,8 @@ import {
   RotateCw,
   FlipHorizontal2,
   FlipVertical2,
-  Undo2,
-  Redo2,
   Copy,
   ClipboardPaste,
-  RefreshCcw,
   Layers,
 } from "lucide-react";
 import { adjustmentControls, type Photo, type Recipe } from "../shared/model";
@@ -84,33 +81,6 @@ export function Adjustments({
             {name}
           </button>
         ))}
-      </div>
-      <div className="tool-row">
-        <Btn
-          title="Undo (⌘Z)"
-          aria-label="Undo"
-          disabled={!photo?.history.length || busy}
-          onClick={() => onAction("undo")}
-        >
-          <Undo2 size={16} />
-        </Btn>
-        <Btn
-          title="Redo (⇧⌘Z)"
-          aria-label="Redo"
-          disabled={!photo?.future.length || busy}
-          onClick={() => onAction("redo")}
-        >
-          <Redo2 size={16} />
-        </Btn>
-        <span className="spacer" />
-        <Btn
-          title="Reset edits"
-          aria-label="Reset edits"
-          disabled={!photo || busy}
-          onClick={() => onAction("reset_edits")}
-        >
-          <RefreshCcw size={15} />
-        </Btn>
       </div>
       <div
         className="adjustments-scroll"

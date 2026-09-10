@@ -1,4 +1,8 @@
-import sharp from "sharp";
+import sharp, { type OutputInfo } from "sharp";
+import { ByteCache } from "./cache.js";
+type RawImage = { data: Buffer; info: OutputInfo };
+const sourceCache = new ByteCache<RawImage>(64 * 1024 * 1024);
+const geometryCache = new ByteCache<RawImage>(32 * 1024 * 1024);
 import exifReader from "exif-reader";
 import { stat } from "node:fs/promises";
 import { z } from "zod";
@@ -74,12 +78,50 @@ export async function inspectImage(file: string): Promise<ImageInfo> {
 function pixels(data: Buffer, width: number, height: number, r: Recipe) {
   const exposure = 2 ** r.exposure;
   const hue = r.hue;
+  // Input channels are bytes: this table is exactly equivalent to six power operations per pixel.
+  const exposed = Float64Array.from({ length: 256 }, (_, i) =>
+    gamma(linear(i / 255) * exposure),
+  );
+  if (
+    ![
+      r.highlights,
+      r.shadows,
+      r.whites,
+      r.blacks,
+      r.hue,
+      r.saturation,
+      r.vibrance,
+      r.vignette,
+    ].some(Boolean)
+  ) {
+    const channel = (temperature: number, tint: number) =>
+      Uint8Array.from(exposed, (v) =>
+        Math.round(
+          clamp(
+            (v - 0.5) * (1 + r.contrast / 100) +
+              0.5 +
+              r.brightness / 200 +
+              temperature +
+              tint,
+          ) * 255,
+        ),
+      );
+    const red = channel(r.temperature / 1000, r.tint / 2000),
+      green = channel(0, -r.tint / 1000),
+      blue = channel(-r.temperature / 1000, r.tint / 2000);
+    for (let i = 0; i < data.length; i += 4) {
+      data[i] = red[data[i]];
+      data[i + 1] = green[data[i + 1]];
+      data[i + 2] = blue[data[i + 2]];
+    }
+    return data;
+  }
   for (let y = 0; y < height; y++)
     for (let x = 0; x < width; x++) {
       const i = (y * width + x) * 4;
-      let red = gamma(linear(data[i] / 255) * exposure),
-        green = gamma(linear(data[i + 1] / 255) * exposure),
-        blue = gamma(linear(data[i + 2] / 255) * exposure);
+      let red = exposed[data[i]],
+        green = exposed[data[i + 1]],
+        blue = exposed[data[i + 2]];
       const contrast = 1 + r.contrast / 100;
       red = (red - 0.5) * contrast + 0.5 + r.brightness / 200;
       green = (green - 0.5) * contrast + 0.5 + r.brightness / 200;
@@ -154,19 +196,86 @@ export async function renderImage(
   const r = recipeSchema.parse(recipe);
   const opts = z
     .object({
+      preview: z.boolean().optional(),
       maxDimension: z.number().int().min(16).max(20000).optional(),
       format: z.enum(["jpeg", "png", "webp"]).optional(),
       quality: z.number().int().min(1).max(100).optional(),
     })
     .strict()
     .parse(options);
+  const fileStat = opts.preview ? await stat(file) : undefined;
+  const stamp = fileStat
+    ? `${file}:${fileStat.size}:${fileStat.mtimeMs}:${fileStat.ctimeMs}`
+    : "";
+  const key = JSON.stringify([
+    stamp,
+    opts.maxDimension,
+    r.rotation,
+    r.straighten,
+    r.flipX,
+    r.flipY,
+    r.crop,
+  ]);
+  let rendered = opts.preview ? geometryCache.get(key) : undefined;
+  if (!rendered) {
+    rendered = await prepare(file, r, opts, stamp);
+    if (opts.preview)
+      geometryCache.set(key, rendered, rendered.data.byteLength);
+  }
+  let output = sharp(
+    pixels(
+      Buffer.from(rendered.data),
+      rendered.info.width,
+      rendered.info.height,
+      r,
+    ),
+    { raw: rendered.info },
+  );
+  if (r.sharpening > 0)
+    output = output.sharpen({ sigma: 0.5 + (r.sharpening / 100) * 1.5 });
+  if (opts.format === "jpeg")
+    return output
+      .flatten({ background: "#ffffff" })
+      .jpeg({ quality: opts.quality ?? 90, chromaSubsampling: "4:4:4" })
+      .toBuffer();
+  if (opts.format === "webp")
+    return output.webp({ quality: opts.quality ?? 90 }).toBuffer();
+  return output.png().toBuffer();
+}
+
+async function prepare(
+  file: string,
+  r: Recipe,
+  opts: RenderOptions,
+  stamp: string,
+): Promise<RawImage> {
   // Materialize separate geometry stages: Sharp applies only the last rotation within a pipeline.
-  let raw = await sharp(file, { limitInputPixels: MAX_PIXELS, failOn: "error" })
-    .autoOrient()
-    .toColourspace("srgb")
-    .ensureAlpha()
-    .raw()
-    .toBuffer({ resolveWithObject: true });
+  // Keep enough source pixels for the requested crop and inward rotation. Full-size
+  // viewing and export bypass downsampling. Both caches are byte-bounded per worker.
+  const edge = Math.ceil(
+    Math.max(
+      512,
+      ((opts.maxDimension ?? 1600) * 2) /
+        Math.min(r.crop?.width ?? 1, r.crop?.height ?? 1),
+    ),
+  );
+  const sourceKey = `${stamp}:${edge}`;
+  let raw = opts.preview ? sourceCache.get(sourceKey) : undefined;
+  if (!raw) {
+    let decoded = sharp(file, { limitInputPixels: MAX_PIXELS, failOn: "error" })
+      .autoOrient()
+      .toColourspace("srgb")
+      .ensureAlpha();
+    if (opts.preview && edge < 20000)
+      decoded = decoded.resize({
+        width: edge,
+        height: edge,
+        fit: "inside",
+        withoutEnlargement: true,
+      });
+    raw = await decoded.raw().toBuffer({ resolveWithObject: true });
+    if (opts.preview) sourceCache.set(sourceKey, raw, raw.data.byteLength);
+  }
   let pipeline = sharp(raw.data, { raw: raw.info });
   if (r.rotation) {
     raw = await pipeline
@@ -228,19 +337,5 @@ export async function renderImage(
       fit: "inside",
       withoutEnlargement: true,
     });
-  const rendered = await pipeline.raw().toBuffer({ resolveWithObject: true });
-  let output = sharp(
-    pixels(rendered.data, rendered.info.width, rendered.info.height, r),
-    { raw: rendered.info },
-  );
-  if (r.sharpening > 0)
-    output = output.sharpen({ sigma: 0.5 + (r.sharpening / 100) * 1.5 });
-  if (opts.format === "jpeg")
-    return output
-      .flatten({ background: "#ffffff" })
-      .jpeg({ quality: opts.quality ?? 90, chromaSubsampling: "4:4:4" })
-      .toBuffer();
-  if (opts.format === "webp")
-    return output.webp({ quality: opts.quality ?? 90 }).toBuffer();
-  return output.png().toBuffer();
+  return pipeline.raw().toBuffer({ resolveWithObject: true });
 }
