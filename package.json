@@ -49,7 +49,9 @@
     "productName": "Lumaflux",
     "files": [
       "dist/**/*",
-      "package.json"
+      "package.json",
+      "LICENSE",
+      "THIRD_PARTY_NOTICES.md"
     ],
     "asarUnpack": [
       "node_modules/sharp/**/*",
@@ -67,6 +69,22 @@
       {
         "from": "dist/mcp/stdio.js",
         "to": "mcp/stdio.mjs"
+      },
+      {
+        "from": "data/lensfun",
+        "to": "licenses/lensfun",
+        "filter": [
+          "COPYING",
+          "README.md"
+        ]
+      },
+      {
+        "from": "THIRD_PARTY_NOTICES.md",
+        "to": "licenses/THIRD_PARTY_NOTICES.md"
+      },
+      {
+        "from": "skills/professional-photo-editing",
+        "to": "skills/professional-photo-editing"
       }
     ]
   },
@@ -74,5 +92,6 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/IT-PSAPE/lumaflux.git"
-  }
+  },
+  "license": "MIT"
 }

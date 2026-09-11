@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { lensProfileSchema } from "./lens-profile.js";
 
 export const adjustmentControls = [
   ["exposure", "Exposure", -5, 5, 0.05, "Light"],
@@ -51,6 +52,7 @@ export const recipeSchema = z
     vibrance: signed.default(0),
     noiseLuminance: z.number().min(0).max(100).default(0),
     noiseColor: z.number().min(0).max(100).default(0),
+    lensProfile: lensProfileSchema.nullable().default(null),
     lensDistortion: signed.default(0),
     lensVignette: z.number().min(0).max(100).default(0),
     lensRed: signed.default(0),

@@ -1,3 +1,4 @@
+import { correctProfile } from "./profile-render.js";
 import { correctLens } from "./lens.js";
 import { denoise } from "./denoise.js";
 import { isRawFile } from "../shared/formats.js";
@@ -61,6 +62,11 @@ export async function inspectImage(file: string): Promise<ImageInfo> {
       if (image?.Make || image?.Model)
         camera.Camera = [image?.Make, image?.Model].filter(Boolean).join(" ");
       if (photo?.LensModel) camera.Lens = photo.LensModel;
+      if (image?.Make) camera["Camera make"] = image.Make;
+      if (image?.Model) camera["Camera model"] = image.Model;
+      if (image?.Software) camera.Software = image.Software;
+      if (photo?.SubjectDistance && Number.isFinite(photo.SubjectDistance))
+        camera["Focus distance"] = `${photo.SubjectDistance} m`;
       if (photo?.ExposureTime)
         camera.Shutter =
           photo.ExposureTime < 1
@@ -230,6 +236,7 @@ export async function renderImage(
     r.flipX,
     r.flipY,
     r.crop,
+    r.lensProfile,
     r.lensDistortion,
     r.lensVignette,
     r.lensRed,
@@ -317,6 +324,16 @@ async function prepare(
     raw = await decoded.raw().toBuffer({ resolveWithObject: true });
     if (opts.preview) sourceCache.set(sourceKey, raw, raw.data.byteLength);
   }
+  if (r.lensProfile)
+    raw = {
+      ...raw,
+      data: correctProfile(
+        raw.data,
+        raw.info.width,
+        raw.info.height,
+        r.lensProfile,
+      ),
+    };
   raw = {
     ...raw,
     data: correctLens(raw.data, raw.info.width, raw.info.height, r),

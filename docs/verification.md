@@ -87,3 +87,11 @@ The rebuilt Apple Silicon desktop app also passed `node scripts/release-smoke.mj
 Added a compact histogram above the inspector tabs with overlapping RGB distributions, draggable tone regions, channel clipping indicators and overlays, J toggling, and hovered-pixel RGB percentages. Statistics reuse the displayed preview and follow composition crops without an additional backend render. See `docs/histogram.md` for sampling and color-space details.
 
 All 57 tests and TypeScript checks pass. The rebuilt Apple Silicon app passed `node scripts/release-smoke.mjs`, including histogram placement, exposure-driven graph updates, drag input, clipping toggle/overlay pixels, RGB readout, and the existing edit/export/MCP/relaunch workflow. Visually checked `output/playwright/histogram.png`. No public release was created.
+
+## Auto correction and photographic agent workflow
+
+Added metadata-matched Lensfun calibration snapshots, individual Light Auto, measured reference-tone suggestions, candidate/original/uncropped MCP previews, and a bundled professional photography skill exposed through MCP instructions/tool/resource/prompt. Source research, limitations, data provenance, and license separation are documented in `docs/auto-editing-research.md` and `data/lensfun/README.md`.
+
+65 unit/integration tests pass. Coverage includes retained JPEG EXIF, missing/unknown metadata, calibrated sampling and alpha, original-byte preservation, history/persistence, stale-revision rejection, reference adaptation rather than copied recipes, deterministic Auto, transparent input, and new MCP discovery/preview operations. Type checking, the Electron workflow, packaging, and the complete packaged-app smoke test pass on Apple Silicon macOS. The desktop workflow clicks both Auto buttons, removes the applied profile, and retains crop/compare/agent/export/relink behavior. `auto-light.png` and `auto-lens.png` were inspected locally. Packaged Lensfun notices/license and the installable skill are present.
+
+A local 1000×750 synthetic profile render measured about 124 ms after reducing inner-loop allocations (previous implementation: 362 ms). This is a local timing, not a full-resolution or end-to-end latency guarantee. No new release version was requested or published.

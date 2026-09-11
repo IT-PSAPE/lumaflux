@@ -1,3 +1,6 @@
+import { analyzePhoto, suggestAutoTone } from "../imaging/auto-tone.js";
+import { inspectImage } from "../imaging/render.js";
+import { matchLensProfile } from "../imaging/lens-profiles.js";
 import { readdir, realpath } from "node:fs/promises";
 import path from "node:path";
 import { imageExtensions } from "../shared/formats.js";
@@ -50,6 +53,113 @@ export class Commands {
             )
             .sort((a, b) => a.name.localeCompare(b.name))
             .map(item),
+        };
+      }
+      case "get_lens_match":
+      case "auto_lens_correction": {
+        const a = (
+          name === "auto_lens_correction"
+            ? z.object({ id, expectedRevision: rev })
+            : z.object({ id })
+        )
+          .strict()
+          .parse(args);
+        const photo = this.service.photo(a.id);
+        if ("expectedRevision" in a && photo.revision !== a.expectedRevision)
+          throw new Error(
+            "REVISION_CONFLICT: Photo changed; re-read it before applying Auto.",
+          );
+        const info = await inspectImage(photo.path);
+        const result = matchLensProfile(info.metadata ?? {});
+        if (info.format === "jpeg" || info.format === "png")
+          result.warnings.push(
+            "Rendered files may already include lens correction. Compare before/after to avoid double correction.",
+          );
+        if (name === "auto_lens_correction" && result.profile) {
+          await this.service.edit(
+            [
+              {
+                id: photo.id,
+                expectedRevision: photo.revision,
+                patch: { lensProfile: result.profile },
+              },
+            ],
+            source,
+          );
+        }
+        return {
+          ...result,
+          applied: name === "auto_lens_correction" && !!result.profile,
+        };
+      }
+      case "analyze_photo": {
+        const a = z.object({ id }).strict().parse(args),
+          photo = this.service.photo(a.id);
+        return {
+          id: photo.id,
+          revision: photo.revision,
+          format: photo.format,
+          metadata: photo.metadata,
+          analysis: await analyzePhoto(this.render, photo.path, photo.recipe),
+        };
+      }
+      case "suggest_adjustments":
+      case "auto_adjust": {
+        const a = (
+          name === "auto_adjust"
+            ? z.object({
+                id,
+                expectedRevision: rev,
+                referenceId: id.optional(),
+              })
+            : z.object({ id, referenceId: id.optional() })
+        )
+          .strict()
+          .parse(args);
+        const photo = this.service.photo(a.id);
+        if ("expectedRevision" in a && photo.revision !== a.expectedRevision)
+          throw new Error(
+            "REVISION_CONFLICT: Photo changed; re-read it before applying Auto.",
+          );
+        if (a.referenceId === a.id)
+          throw new Error(
+            "INVALID_REFERENCE: Choose a different reference photo.",
+          );
+        const reference = a.referenceId
+          ? this.service.photo(a.referenceId)
+          : undefined;
+        const result = await suggestAutoTone(
+          this.render,
+          photo.path,
+          photo.recipe,
+          reference
+            ? { file: reference.path, recipe: reference.recipe }
+            : undefined,
+        );
+        if (
+          reference &&
+          this.service.photo(reference.id).revision !== reference.revision
+        )
+          throw new Error(
+            "REVISION_CONFLICT: Reference changed during analysis.",
+          );
+        if (name === "auto_adjust")
+          await this.service.edit(
+            [
+              {
+                id: photo.id,
+                expectedRevision: photo.revision,
+                patch: result.patch,
+              },
+            ],
+            source,
+          );
+        return {
+          id: photo.id,
+          expectedRevision: photo.revision,
+          referenceId: reference?.id,
+          referenceRevision: reference?.revision,
+          ...result,
         };
       }
       case "get_app_state":

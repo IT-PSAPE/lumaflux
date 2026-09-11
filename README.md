@@ -17,7 +17,7 @@ npm run dev
 npm run package
 ```
 
-On this Mac, the local application is generated at `release/mac-arm64/Lumaflux.app`. It is an unsigned local build, not a notarized distribution. Windows/Linux packaging is not yet verified.
+On this Mac, the local application is generated at `release/mac-arm64/Lumaflux.app`. It is an unsigned local build, not a notarized distribution. The published release workflow builds Windows, macOS, and Linux; local feature checks here use Apple Silicon macOS.
 
 ## Photo workflow
 
@@ -108,3 +108,19 @@ RAW decoding uses [LibRaw-Wasm](https://github.com/ybouane/LibRaw-Wasm) 1.6.0, b
 Lens correction is available under **Composition → Lens correction** (manual distortion, corner illumination, and red/blue fringe alignment). **Adjustments → Details** contains separate luminance and color noise reduction. Both work with RAW/raster photos, exports, undo, and MCP edits. See [lens correction and denoising](docs/lens-and-denoising.md) for ranges, behavior, and limitations.
 
 The inspector's RGB histogram supports tonal-region dragging, clipping previews (hover or click the corner indicators; **J** toggles both), and RGB readings when hovering over the edited photo. It updates from the rendered preview and follows the current crop. See [histogram behavior](docs/histogram.md).
+
+## Automatic correction and professional editing
+
+**Auto** at the right of **Light** measures the selected image and applies conservative, undoable tonal adjustments. **Auto** at the right of **Lens correction** reads camera/lens/focal metadata and matches a bundled Lensfun calibration. JPEG and PNG can retain EXIF too. Missing or ambiguous matches are reported without guessed edits. Profile changes clear the crop; manual lens offsets remain adjustable. **Remove profile** disables the calibration.
+
+Agents now receive a professional photography guide through MCP initialization, `get_editing_guide`, `lumaflux://guides/professional-editing`, and the `professional-photo-edit` prompt. The portable [skill](skills/professional-photo-editing/SKILL.md) is also included with packaged apps. Restart Lumaflux and reconnect the agent to discover the new tools.
+
+- `analyze_photo({id})`: measured rendered tone, clipping, and color statistics.
+- `get_lens_match({id})`: inspect calibration availability; `auto_lens_correction({id, expectedRevision})` applies it.
+- `suggest_adjustments({id, referenceId?})`: propose image-specific Light adjustments. A reference fits its rendered tone; it does not copy recipe values. Apply the returned patch with `apply_edits` and its `expectedRevision`.
+- `auto_adjust({id, expectedRevision, referenceId?})`: calculate and apply directly with undo.
+- `get_preview({id, original?, uncropped?, patch?})`: inspect an original, full composition, or candidate edit without committing it.
+
+The guide calls for individual visual inspection, natural color, an explicit crop/no-crop decision, and before/after verification. Automatic tone is a starting point, not semantic subject recognition. RAW currently develops to 8-bit sRGB before slider edits; it does not reconstruct clipped sensor highlights. Full rationale, source comparisons, and limitations are in [the research report](docs/auto-editing-research.md).
+
+Application code is MIT licensed. The separately attributed Lensfun calibration data remains CC BY-SA 3.0; see [third-party notices](THIRD_PARTY_NOTICES.md).

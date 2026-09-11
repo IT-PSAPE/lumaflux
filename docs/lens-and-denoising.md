@@ -4,7 +4,7 @@ This addition builds on upstream `2fc6fa4`, including the RAW decoder.
 
 ## Controls
 
-Composition → Lens correction exposes manual distortion (-100 to 100), corner illumination (0 to 100), red/cyan fringe alignment (-100 to 100), and blue/yellow fringe alignment (-100 to 100). Zero disables each correction. These are generic controls, not automatic EXIF-selected calibration profiles.
+Composition → Lens correction exposes manual distortion (-100 to 100), corner illumination (0 to 100), red/cyan fringe alignment (-100 to 100), and blue/yellow fringe alignment (-100 to 100). Zero disables each correction. These manual offsets now coexist with **Auto**, which matches camera/lens/focal metadata against bundled Lensfun calibrations. See [automatic editing research and behavior](auto-editing-research.md).
 
 Distortion uses a radial polynomial with bilinear, alpha-aware resampling and automatic inward scaling to avoid introducing empty borders. Chromatic correction radially aligns the red and blue channels to green (maximum ±0.5%). Corner illumination compensates dark corners in source coordinates before any warp or crop, separately from the creative Vignette adjustment.
 
@@ -20,7 +20,7 @@ MCP `get_capabilities` describes these controls; `apply_edits` and `apply_batch_
 
 ## References
 
-The manual radial model and ordering were informed by [Lensfun's correction models](https://lensfun.github.io/manual/v0.3.1/group__Lens.html) and [correction ordering](https://lensfun.github.io/manual/v0.3.1/corrections.html). Edge-aware denoising follows the bilateral-filter principle described by [Tomasi and Manduchi](https://users.cs.duke.edu/~tomasi/papers/tomasi/tomasiIccv98.pdf), using a separable approximation for interactive operation. No Lensfun database or code is bundled.
+The manual radial model and ordering were informed by [Lensfun's correction models](https://lensfun.github.io/manual/v0.3.1/group__Lens.html) and [correction ordering](https://lensfun.github.io/manual/v0.3.1/corrections.html). Edge-aware denoising follows the bilateral-filter principle described by [Tomasi and Manduchi](https://users.cs.duke.edu/~tomasi/papers/tomasi/tomasiIccv98.pdf), using a separable approximation for interactive operation. The later Auto feature bundles an attributed Lensfun database subset under CC BY-SA 3.0; no Lensfun library code is incorporated.
 
 ## Verification
 

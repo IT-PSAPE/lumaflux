@@ -37,6 +37,14 @@ for (let y = 0; y < 800; y++)
     pixels[i + 2] = Math.round((1 - x / 1200) * 160 + 30);
   }
 await sharp(pixels, { raw: { width: 1200, height: 800, channels: 3 } })
+  .withExif({
+    IFD0: { Make: "Canon", Model: "Canon EOS 5D Mark II" },
+    IFD2: {
+      LensModel: "Canon EF 50mm f/1.8 II",
+      FocalLength: "50/1",
+      FNumber: "4/1",
+    },
+  })
   .png()
   .toFile(source);
 await sharp(pixels, { raw: { width: 1200, height: 800, channels: 3 } })
@@ -305,7 +313,37 @@ try {
     ),
   );
   await page.screenshot({ path: "output/playwright/denoising.png" });
+  await page.getByRole("button", { name: "Auto light", exact: true }).click();
+  await poll(async () =>
+    page.getByRole("button", { name: "Auto light", exact: true }).isEnabled(),
+  );
+  await page.screenshot({ path: "output/playwright/auto-light.png" });
   await page.getByRole("tab", { name: "Composition", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Auto lens correction", exact: true })
+    .click();
+  await poll(async () =>
+    page.evaluate(async () =>
+      (await window.lumaflux.command("get_app_state")).photos.some(
+        (p) => !!p.recipe.lensProfile,
+      ),
+    ),
+  );
+  await page
+    .getByRole("button", { name: "Remove profile", exact: true })
+    .waitFor();
+  await page.screenshot({ path: "output/playwright/auto-lens.png" });
+  await page
+    .getByRole("button", { name: "Remove profile", exact: true })
+    .click();
+  await poll(async () =>
+    page.evaluate(async () =>
+      (await window.lumaflux.command("get_app_state")).photos.every(
+        (p) => !p.recipe.lensProfile,
+      ),
+    ),
+  );
+
   await poll(() =>
     page.getByRole("slider", { name: "Distortion", exact: true }).isEnabled(),
   );

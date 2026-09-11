@@ -222,12 +222,48 @@ export function Adjustments({
               : []
           ).map((group) => (
             <details open={group !== "Detail"} key={group}>
-              <summary>{group === "Detail" ? "Details" : group}</summary>
+              <summary>
+                {group === "Detail" ? "Details" : group}
+                {(group === "Light" || group === "Lens correction") && (
+                  <button
+                    className="section-auto"
+                    aria-label={
+                      group === "Light" ? "Auto light" : "Auto lens correction"
+                    }
+                    disabled={!photo || busy || photo.missing}
+                    title={
+                      group === "Light"
+                        ? "Analyze this photo and adjust light"
+                        : "Match camera and lens metadata to a calibrated profile"
+                    }
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      onAction(
+                        group === "Light"
+                          ? "auto_adjust"
+                          : "auto_lens_correction",
+                      );
+                    }}
+                  >
+                    Auto
+                  </button>
+                )}
+              </summary>
               {group === "Lens correction" && (
                 <p className="muted panel-help">
-                  Manual correction. Distortion keeps edges in bounds; fringe
-                  sliders align red and blue channels.
+                  {recipe?.lensProfile
+                    ? `${recipe.lensProfile.name} · ${recipe.lensProfile.focal} mm · Lensfun`
+                    : "Auto matches camera and lens metadata. Manual controls remain available."}
                 </p>
+              )}
+              {group === "Lens correction" && recipe?.lensProfile && (
+                <Btn
+                  className="wide"
+                  onClick={() => onCommit({ lensProfile: null })}
+                >
+                  Remove profile
+                </Btn>
               )}
               {group === "Detail" && (
                 <p className="muted panel-help">

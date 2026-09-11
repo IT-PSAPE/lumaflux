@@ -125,6 +125,7 @@ export function App() {
     photo?.recipe.straighten,
     photo?.recipe.flipX,
     photo?.recipe.flipY,
+    JSON.stringify(photo?.recipe.lensProfile),
     photo?.recipe.lensDistortion,
     photo?.recipe.lensRed,
     photo?.recipe.lensBlue,
@@ -209,6 +210,26 @@ export function App() {
   };
   const action = async (name: string) => {
     if (!photo) return;
+    if (name === "auto_adjust" || name === "auto_lens_correction") {
+      setBusy(true);
+      try {
+        const result = await run(name, {
+          id: photo.id,
+          expectedRevision: photo.revision,
+        });
+        setNotice(
+          [
+            result.message ??
+              "Auto light adjustments applied. Review the result with Compare.",
+            ...(result.warnings ?? []),
+          ].join(" "),
+        );
+      } finally {
+        setDraft(null);
+        setBusy(false);
+      }
+      return;
+    }
     if (name === "relink") {
       const file = await api.chooseRelink();
       if (file) await run("relink", { id: photo.id, path: file });

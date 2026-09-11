@@ -1420,3 +1420,24 @@ fieldset {
 .crop-rectangle {
   z-index: 2;
 }
+
+.section-auto {
+  float: right;
+  border: 1px solid #494249;
+  background: #343034;
+  color: #f0b7d1;
+  border-radius: 3px;
+  font-size: 10px;
+  line-height: 16px;
+  padding: 0 7px;
+  margin-top: -1px;
+  cursor: pointer;
+}
+.section-auto:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.section-auto:focus-visible {
+  outline: 1px solid #ef81b0;
+  outline-offset: 2px;
+}

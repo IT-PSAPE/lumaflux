@@ -1,3 +1,5 @@
+import { editingGuide, editingInstructions } from "./editing-guide.js";
+import { lensDatabaseInfo } from "../imaging/lens-profiles.js";
 import { importFormats } from "../shared/formats.js";
 import { createServer, type Server } from "node:http";
 import { randomUUID, timingSafeEqual } from "node:crypto";
@@ -17,7 +19,11 @@ import {
   ErrorCode,
 } from "@modelcontextprotocol/sdk/types.js";
 import { Commands } from "../core/commands.js";
-import { patchSchema, adjustmentControls } from "../shared/model.js";
+import {
+  patchSchema,
+  adjustmentControls,
+  neutralRecipe,
+} from "../shared/model.js";
 import { exportSchema } from "../core/export.js";
 
 export async function assertAllowed(file: string, roots: string[]) {
@@ -64,7 +70,10 @@ const errorResult = (e: unknown) => ({
 export function createMcpServer(commands: Commands, roots: string[]) {
   const server = new McpServer(
     { name: "lumaflux", version: "0.1.0" },
-    { capabilities: { resources: { subscribe: true } } },
+    {
+      capabilities: { resources: { subscribe: true } },
+      instructions: editingInstructions,
+    },
   );
   const id = z.string().min(1);
   const expectedRevision = z.number().int().nonnegative();
@@ -113,13 +122,13 @@ export function createMcpServer(commands: Commands, roots: string[]) {
           crop: "normalized after lens correction/orientation/rotation/flips; null resets",
         },
         lensCorrection: {
-          mode: "manual",
+          mode: "metadata-matched Lensfun profiles plus manual offsets",
           distortion:
             "-100–100; zero off; automatically keeps frame inside source",
           cornerIllumination: "0–100; compensates dark corners before geometry",
           chromaticAberration:
             "lensRed/lensBlue -100–100; radial channel alignment",
-          profiles: false,
+          profiles: lensDatabaseInfo,
         },
         denoising: {
           luminance: "noiseLuminance 0–100",
@@ -127,12 +136,91 @@ export function createMcpServer(commands: Commands, roots: string[]) {
           method:
             "separable edge-aware bilateral filter before tone and sharpening; zero bypasses",
         },
+        photographyGuide: "lumaflux://guides/professional-editing",
+        autoAdjust:
+          "Measured Light adjustment per image; suggest_adjustments supports referenceId without copying values.",
+        rawProcessing:
+          "LibRaw camera WB; fixed brightness; 8-bit sRGB editing, no sensor highlight reconstruction.",
         atomicBatch: true,
         mutations:
           "Supply current expectedRevision. Undo/redo also increment revision.",
         maxBatch: 500,
       }),
   );
+  tool(
+    "get_editing_guide",
+    "Read the professional photography workflow before editing. Covers RAW, composition, natural tone/color, adaptive reference matching, and visual verification.",
+    {},
+    true,
+    async () => ({ content: [{ type: "text", text: editingGuide }] }),
+  );
+  server.registerResource(
+    "professional-editing",
+    "lumaflux://guides/professional-editing",
+    {
+      mimeType: "text/markdown",
+      description: "Image-specific professional photo editing workflow",
+    },
+    async (uri) => ({ contents: [{ uri: uri.href, text: editingGuide }] }),
+  );
+  server.registerPrompt(
+    "professional-photo-edit",
+    {
+      description:
+        "Develop or reference-match photos with individual analysis and composition review.",
+      argsSchema: { request: z.string(), referenceId: z.string().optional() },
+    },
+    async (a) => ({
+      messages: [
+        {
+          role: "user",
+          content: {
+            type: "text",
+            text:
+              editingGuide +
+              "\n\nPhotography request: " +
+              a.request +
+              (a.referenceId ? "\nReference photo ID: " + a.referenceId : ""),
+          },
+        },
+      ],
+    }),
+  );
+  for (const [name, description, schema, readOnly] of [
+    [
+      "analyze_photo",
+      "Measure the current rendered photo: tone, channel clipping, and color. Pair with get_preview for subject/composition judgment.",
+      { id },
+      true,
+    ],
+    [
+      "get_lens_match",
+      "Inspect camera/lens metadata and available calibrated corrections without editing.",
+      { id },
+      true,
+    ],
+    [
+      "suggest_adjustments",
+      "Analyze an individual photo and propose Light settings. Optional referenceId matches rendered tone rather than copying settings. Inspect candidate using get_preview(patch) before apply_edits.",
+      { id, referenceId: id.optional() },
+      true,
+    ],
+    [
+      "auto_adjust",
+      "Apply measured Light settings with undo. Optional referenceId adapts this photo to reference tone. Color, detail, and composition are preserved; visually review afterward.",
+      { id, expectedRevision, referenceId: id.optional() },
+      false,
+    ],
+    [
+      "auto_lens_correction",
+      "Apply a Lensfun calibration matched to camera/lens/focal metadata, preserving manual offsets. Returns warnings/no-match without guessed correction. Inspect rendered JPEGs for double correction.",
+      { id, expectedRevision },
+      false,
+    ],
+  ] as const)
+    tool(name, description, schema, readOnly, async (a) =>
+      json(await commands.run(name, a, "MCP")),
+    );
   tool(
     "get_app_state",
     "Current selection, export jobs and recent activity; use list_photos for paginated library.",
@@ -228,7 +316,7 @@ export function createMcpServer(commands: Commands, roots: string[]) {
     ],
     [
       "apply_batch_edits",
-      "Atomically apply edits. If any photo has a conflict, no photo changes.",
+      "Atomically apply individually reviewed patches. For reference matching, call suggest_adjustments(referenceId) for each image instead of duplicating values. Identical patches are for explicit exact-sync requests. Conflicts change nothing.",
       {
         edits: z
           .array(
@@ -256,17 +344,34 @@ export function createMcpServer(commands: Commands, roots: string[]) {
     );
   tool(
     "get_preview",
-    "Return an edited JPEG image for visual inspection, plus revision. Bounded to 1600px by default.",
-    { id, maxDimension: z.number().int().min(64).max(2000).default(1600) },
+    "Visually inspect current, original, uncropped, or candidate edits without committing. patch is a partial recipe; original resets the base. Use uncropped to plan normalized composition. Returns image plus current revision.",
+    {
+      id,
+      maxDimension: z.number().int().min(64).max(2000).default(1600),
+      original: z.boolean().default(false),
+      uncropped: z.boolean().default(false),
+      patch: patchSchema.optional(),
+    },
     true,
     async (a) => {
       const p = commands.service.photo(a.id);
-      const bytes = await commands.preview(a.id, p.recipe, a.maxDimension);
+      const candidate = {
+        ...(a.original ? neutralRecipe() : p.recipe),
+        ...a.patch,
+        ...(a.uncropped ? { crop: null } : {}),
+      };
+      const bytes = await commands.preview(a.id, candidate, a.maxDimension);
       return {
         content: [
           {
             type: "text",
-            text: JSON.stringify({ id: p.id, revision: p.revision }),
+            text: JSON.stringify({
+              id: p.id,
+              revision: p.revision,
+              original: a.original,
+              uncropped: a.uncropped,
+              candidate: !!a.patch,
+            }),
           },
           {
             type: "image",

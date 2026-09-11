@@ -58,6 +58,51 @@ test("MCP authenticates, discovers, edits, previews and rejects stale/out-of-roo
     });
     assert.ok(!imported.isError);
     const p = s.state().photos[0];
+    assert.ok(tools.tools.some((t) => t.name === "suggest_adjustments"));
+    const guide = await client.callTool({
+      name: "get_editing_guide",
+      arguments: {},
+    });
+    assert.match(JSON.stringify(guide), /composition/);
+    const resources = await client.listResources();
+    assert.ok(
+      resources.resources.some(
+        (r) => r.uri === "lumaflux://guides/professional-editing",
+      ),
+    );
+    const prompts = await client.listPrompts();
+    assert.ok(
+      prompts.prompts.some((p) => p.name === "professional-photo-edit"),
+    );
+    const analysis = await client.callTool({
+      name: "analyze_photo",
+      arguments: { id: p.id },
+    });
+    assert.ok(!analysis.isError);
+    assert.match(JSON.stringify(analysis), /percentiles/);
+    const match = await client.callTool({
+      name: "auto_lens_correction",
+      arguments: { id: p.id, expectedRevision: 0 },
+    });
+    assert.ok(!match.isError);
+    assert.equal(s.photo(p.id).revision, 0);
+    const candidate = await client.callTool({
+      name: "get_preview",
+      arguments: {
+        id: p.id,
+        original: true,
+        uncropped: true,
+        patch: { exposure: 1, crop: { x: 0, y: 0, width: 0.5, height: 0.5 } },
+      },
+    });
+    assert.ok(!candidate.isError);
+    assert.equal(s.photo(p.id).revision, 0);
+    const suggestion = await client.callTool({
+      name: "suggest_adjustments",
+      arguments: { id: p.id },
+    });
+    assert.ok(!suggestion.isError);
+    assert.equal(s.photo(p.id).revision, 0);
     assert.ok(
       !(
         await client.callTool({

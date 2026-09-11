@@ -229,13 +229,15 @@ export class PhotoService extends EventEmitter {
           "straighten",
           "flipX",
           "flipY",
+          "lensProfile",
           "lensDistortion",
           "lensRed",
           "lensBlue",
         ].some(
           (k) =>
             k in e.patch &&
-            e.patch[k as keyof Recipe] !== p.recipe[k as keyof Recipe],
+            JSON.stringify(e.patch[k as keyof Recipe]) !==
+              JSON.stringify(p.recipe[k as keyof Recipe]),
         );
         const recipe = recipeSchema.parse({
           ...p.recipe,
